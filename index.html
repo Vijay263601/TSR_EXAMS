@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Online Exam</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+  body {
+    font-family: Inter, Arial, sans-serif;
+    background: #f1f5f9;
+    margin: 0;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: auto;
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .timer {
+    font-weight: 700;
+    color: #dc2626;
+  }
+
+  .question {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 15px;
+  }
+
+  .option {
+    padding: 12px;
+    border: 1px solid #cbd5f5;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+
+  .option.selected {
+    background: #2563eb;
+    color: white;
+  }
+
+  button {
+    padding: 12px 20px;
+    margin-top: 20px;
+    border: none;
+    border-radius: 8px;
+    background: #2563eb;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  button.secondary {
+    background: #64748b;
+    margin-right: 10px;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <div class="topbar">
+    <div><b>Exam:</b> <span id="examIdText"></span></div>
+    <div class="timer" id="timer">00:00</div>
+  </div>
+
+  <div class="question" id="questionText">Loading...</div>
+
+  <div id="options"></div>
+
+  <div>
+    <button class="secondary" onclick="prev()">Previous</button>
+    <button onclick="next()">Next</button>
+    <button onclick="submitExam()">Submit</button>
+  </div>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const API_URL = "https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF-lNlO2HBP_5s-32sTjDRudaOujV8KkrIsmC5yw3u/exec";
+const MAX_TAB_SWITCH = 2;
+const EXAM_DURATION_MINUTES = 30;
+/* ========================================= */
+
+const urlParams = new URLSearchParams(window.location.search);
+const examId = urlParams.get("examId");
+
+document.getElementById("examIdText").innerText = examId;
+
+let questions = [];
+let current = 0;
+let answers = {};
+let cheated = false;
+let tabSwitches = 0;
+
+/* ---------- Anti Cheat ---------- */
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    tabSwitches++;
+    if (tabSwitches > MAX_TAB_SWITCH) {
+      cheated = true;
+      alert("Exam terminated due to cheating");
+      submitExam();
+    }
+  }
+});
+
+/* ---------- Timer ---------- */
+let timeLeft = EXAM_DURATION_MINUTES * 60;
+const timerInterval = setInterval(() => {
+  const m = Math.floor(timeLeft / 60);
+  const s = timeLeft % 60;
+  document.getElementById("timer").innerText =
+    `${m}:${s < 10 ? "0" : ""}${s}`;
+  timeLeft--;
+
+  if (timeLeft < 0) {
+    alert("Time up! Submitting exam.");
+    submitExam();
+  }
+}, 1000);
+
+/* ---------- Load Questions ---------- */
+fetch(API_URL, {
+  method: "POST",
+  body: JSON.stringify({
+    type: "GET_QUESTIONS",
+    examId: examId
+  })
+})
+.then(res => res.json())
+.then(data => {
+  questions = data;
+  showQuestion();
+});
+
+/* ---------- Render Question ---------- */
+function showQuestion() {
+  const q = questions[current];
+  if (!q) return;
+
+  document.getElementById("questionText").innerText =
+    `Q${current + 1}. ${q.question}`;
+
+  const optionsDiv = document.getElementById("options");
+  optionsDiv.innerHTML = "";
+
+  ["A", "B", "C", "D"].forEach(opt => {
+    const div = document.createElement("div");
+    div.className = "option";
+    div.innerText = q[opt];
+    if (answers[q.qid] === opt) div.classList.add("selected");
+
+    div.onclick = () => {
+      answers[q.qid] = opt;
+      showQuestion();
+    };
+
+    optionsDiv.appendChild(div);
+  });
+}
+
+function next() {
+  if (current < questions.length - 1) {
+    current++;
+    showQuestion();
+  }
+}
+
+function prev() {
+  if (current > 0) {
+    current--;
+    showQuestion();
+  }
+}
+
+/* ---------- Submit Exam ---------- */
+function submitExam() {
+  clearInterval(timerInterval);
+
+  const answerArray = Object.keys(answers).map(qid => ({
+    qid: qid,
+    answer: answers[qid]
+  }));
+
+  fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "SUBMIT_RESPONSE",
+      examId: examId,
+      email: "student@email.com",
+      cheated: cheated,
+      answers: answerArray
+    })
+  })
+  .then(() => {
+    document.body.innerHTML =
+      "<h2 style='text-align:center'>Exam submitted successfully</h2>";
+  });
+}
+</script>
+
+</body>
+</html>
