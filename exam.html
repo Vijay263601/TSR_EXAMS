@@ -6,159 +6,87 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f1f5f9;
-  padding: 20px;
-}
-.container {
-  max-width: 800px;
-  margin: auto;
-  background: #fff;
-  padding: 25px;
-  border-radius: 12px;
-}
-.hidden { display: none; }
-input {
-  width: 100%;
-  padding: 12px;
-  margin: 8px 0;
-  border-radius: 6px;
-  border: 1px solid #cbd5f5;
-}
-.option {
-  padding: 12px;
-  border: 1px solid #cbd5f5;
-  border-radius: 8px;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-.option.selected {
-  background: #2563eb;
-  color: white;
-}
-.timer {
-  color: #dc2626;
-  font-weight: bold;
-}
-button {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 6px;
-  background: #2563eb;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-}
-button.secondary {
-  background: #64748b;
-  margin-right: 8px;
-}
+body { font-family: Arial, sans-serif; background:#f1f5f9; padding:20px; }
+.container { max-width:800px; margin:auto; background:#fff; padding:25px; border-radius:12px; }
+.hidden { display:none; }
+input { width:100%; padding:12px; margin:8px 0; }
+.option { padding:12px; border:1px solid #cbd5f5; margin-bottom:10px; cursor:pointer; border-radius:8px; }
+.option.selected { background:#2563eb; color:#fff; }
+.timer { color:#dc2626; font-weight:bold; }
+button { padding:10px 16px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+button.secondary { background:#64748b; margin-right:8px; }
 </style>
 </head>
 
 <body>
 
-<!-- ================= STUDENT DETAILS ================= -->
+<!-- STUDENT FORM -->
 <div class="container" id="studentForm">
   <h2>Student Details</h2>
-  <p><b>⚠ Fullscreen is mandatory. Exiting fullscreen will terminate the exam.</b></p>
+  <p><b>Fullscreen is mandatory.</b></p>
   <input id="nameInput" placeholder="Full Name">
-  <input id="emailInput" type="email" placeholder="Email">
-  <input id="rollInput" placeholder="Roll Number">
+  <input id="emailInput" placeholder="Email">
+  <input id="rollInput" placeholder="Roll No">
   <button onclick="startExam()">Start Exam</button>
 </div>
 
-<!-- ================= EXAM PAGE ================= -->
+<!-- EXAM -->
 <div class="container hidden" id="examPage">
-  <div>
-    Exam ID: <span id="examIdText"></span>
-    <span class="timer" id="timer"></span>
-  </div>
-
-  <h3 id="questionText">Loading...</h3>
+  <div>Exam ID: <span id="examIdText"></span> <span class="timer" id="timer"></span></div>
+  <h3 id="questionText"></h3>
   <div id="options"></div>
-
   <button class="secondary" onclick="prev()">Previous</button>
   <button onclick="next()">Next</button>
   <button onclick="submitExam()">Submit</button>
 </div>
 
 <script>
-/* ================= CONFIG ================= */
+/* CONFIG */
 const API_URL = "https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF-lNlO2HBP_5s-32sTjDRudaOujV8KkrIsmC5yw3u/exec";
-/* ========================================= */
+const examId = new URLSearchParams(location.search).get("examId");
+examIdText.textContent = examId;
 
-const examId = new URLSearchParams(window.location.search).get("examId");
-document.getElementById("examIdText").textContent = examId;
-
-/* ---------- DOM ---------- */
-const studentForm = document.getElementById("studentForm");
-const examPage = document.getElementById("examPage");
-const questionText = document.getElementById("questionText");
-const optionsDiv = document.getElementById("options");
-const timerEl = document.getElementById("timer");
-
-const nameInput = document.getElementById("nameInput");
-const emailInput = document.getElementById("emailInput");
-const rollInput = document.getElementById("rollInput");
-
-/* ---------- STATE ---------- */
-let questions = [];
-let answers = {};
-let current = 0;
-
-let cheated = false;
-let cheatReason = "";
-let tabSwitches = 0;
-let mobileWarnings = 0;
-
-let MAX_TAB_SWITCH = 2;
-let duration = 0;
-let timerInterval;
-let startTime = 0;
+/* STATE */
+let questions = [], answers = {}, current = 0;
+let cheated = false, cheatReason = "";
+let examFinished = false;
+let duration = 0, MAX_TAB_SWITCH = 2;
+let timerInterval, startTime;
 let fullscreenActive = false;
 
-/* ---------- FULLSCREEN HELPERS ---------- */
-function enterFullscreen() {
+/* FULLSCREEN */
+function enterFullscreen(){
   const el = document.documentElement;
-  if (el.requestFullscreen) return el.requestFullscreen();
-  if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
-  if (el.msRequestFullscreen) return el.msRequestFullscreen();
+  return el.requestFullscreen?.() || el.webkitRequestFullscreen?.();
+}
+function isFullscreen(){
+  return document.fullscreenElement || document.webkitFullscreenElement;
 }
 
-function isFullscreen() {
-  return document.fullscreenElement ||
-         document.webkitFullscreenElement ||
-         document.msFullscreenElement;
-}
-
-/* ---------- START EXAM ---------- */
-async function startExam() {
-  if (!nameInput.value || !emailInput.value || !rollInput.value) {
-    alert("Please fill all details");
-    return;
+/* START EXAM */
+async function startExam(){
+  if(!nameInput.value || !emailInput.value || !rollInput.value){
+    alert("Fill all details"); return;
   }
 
-  // 🔒 Force fullscreen
   try {
     await enterFullscreen();
     fullscreenActive = true;
   } catch {
-    alert("Fullscreen permission is required to start the exam");
-    return;
+    alert("Fullscreen required"); return;
   }
 
   studentForm.classList.add("hidden");
   examPage.classList.remove("hidden");
 
-  const [config, qs] = await Promise.all([
-    fetchConfig(),
-    fetchQuestions()
+  // ⚡ FAST: parallel fetch
+  const [cfg, qs] = await Promise.all([
+    fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})}).then(r=>r.json()),
+    fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})}).then(r=>r.json())
   ]);
 
-  duration = config.duration;
-  MAX_TAB_SWITCH = config.maxTabSwitch;
+  duration = cfg.duration;
+  MAX_TAB_SWITCH = cfg.maxTabSwitch;
   questions = qs;
 
   startTime = Date.now();
@@ -166,152 +94,68 @@ async function startExam() {
   startTimer();
 }
 
-/* ---------- FETCH CONFIG ---------- */
-async function fetchConfig() {
-  const res = await fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify({ type: "GET_EXAM_CONFIG", examId })
-  });
-  return res.json();
-}
-
-/* ---------- FETCH QUESTIONS ---------- */
-async function fetchQuestions() {
-  const res = await fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify({ type: "GET_QUESTIONS", examId })
-  });
-  return res.json();
-}
-
-/* ---------- RENDER QUESTION ---------- */
-function renderQuestion() {
+/* RENDER */
+function renderQuestion(){
   const q = questions[current];
-  if (!q) return;
+  if(!q) return;
+  questionText.textContent = `Q${current+1}. ${q.question}`;
+  options.innerHTML = "";
 
-  questionText.textContent = `Q${current + 1}. ${q.question}`;
-  optionsDiv.innerHTML = "";
-
-  ["A","B","C","D"].forEach(opt => {
-    const div = document.createElement("div");
-    div.className = "option";
-    div.textContent = q[opt];
-
-    if (answers[q.qid] === opt) div.classList.add("selected");
-
-    div.onclick = () => {
-      answers[q.qid] = opt;
-      document.querySelectorAll(".option").forEach(o => o.classList.remove("selected"));
-      div.classList.add("selected");
-    };
-
-    optionsDiv.appendChild(div);
+  ["A","B","C","D"].forEach(o=>{
+    const d=document.createElement("div");
+    d.className="option"+(answers[q.qid]===o?" selected":"");
+    d.textContent=q[o];
+    d.onclick=()=>{ answers[q.qid]=o; renderQuestion(); };
+    options.appendChild(d);
   });
 }
+function next(){ if(current<questions.length-1){ current++; renderQuestion(); } }
+function prev(){ if(current>0){ current--; renderQuestion(); } }
 
-/* ---------- NAV ---------- */
-function next() {
-  if (current < questions.length - 1) {
-    current++;
-    renderQuestion();
-  }
-}
-function prev() {
-  if (current > 0) {
-    current--;
-    renderQuestion();
-  }
+/* TIMER */
+function startTimer(){
+  let t=duration*60;
+  timerInterval=setInterval(()=>{
+    timer.textContent=` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+    if(--t<0){ cheatReason="Time up"; submitExam(); }
+  },1000);
 }
 
-/* ---------- TIMER ---------- */
-function startTimer() {
-  let t = duration * 60;
-  timerInterval = setInterval(() => {
-    timerEl.textContent = ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-    t--;
-    if (t < 0) {
-      cheatReason = "Time up";
-      submitExam();
-    }
-  }, 1000);
-}
-
-/* ---------- FULLSCREEN EXIT DETECTION ---------- */
-document.addEventListener("fullscreenchange", () => {
-  if (!fullscreenActive || examPage.classList.contains("hidden")) return;
-  if (!isFullscreen()) {
-    cheated = true;
-    cheatReason = "Exited fullscreen mode";
-    alert("Fullscreen exit detected. Exam terminated.");
-    submitExam();
+/* 🔒 ANTI-CHEAT (IGNORES AFTER FINISH) */
+document.addEventListener("fullscreenchange",()=>{
+  if(examFinished || !fullscreenActive) return;
+  if(!isFullscreen()){
+    cheated=true; cheatReason="Exited fullscreen"; submitExam();
   }
 });
-
-/* ---------- TAB / APP SWITCH (DESKTOP + MOBILE) ---------- */
-document.addEventListener("visibilitychange", () => {
-  if (examPage.classList.contains("hidden")) return;
-
-  if (document.hidden) {
-    mobileWarnings++;
-    tabSwitches++;
-
-    if (tabSwitches > MAX_TAB_SWITCH || mobileWarnings >= 2) {
-      cheated = true;
-      cheatReason = "App/tab switched during exam";
-      submitExam();
-    }
-  }
+document.addEventListener("visibilitychange",()=>{
+  if(examFinished || document.hidden===false) return;
+  cheated=true; cheatReason="Tab/app switch"; submitExam();
 });
 
-/* ---------- WINDOW BLUR (MOBILE STRONG SIGNAL) ---------- */
-window.addEventListener("blur", () => {
-  if (examPage.classList.contains("hidden")) return;
-  cheated = true;
-  cheatReason = "Window lost focus";
-  submitExam();
-});
+/* SUBMIT */
+function submitExam(){
+  if(examFinished) return;
+  examFinished = true;
 
-/* ---------- PAGE REFRESH / CLOSE ---------- */
-window.addEventListener("beforeunload", () => {
-  if (!cheated && !examPage.classList.contains("hidden")) {
-    cheated = true;
-    cheatReason = "Page refreshed or closed";
-  }
-});
-
-/* ---------- BLOCK COPY / LONG PRESS ---------- */
-document.addEventListener("contextmenu", e => e.preventDefault());
-document.addEventListener("copy", e => e.preventDefault());
-document.addEventListener("paste", e => e.preventDefault());
-document.addEventListener("cut", e => e.preventDefault());
-
-/* ---------- SUBMIT ---------- */
-function submitExam() {
   clearInterval(timerInterval);
 
-  const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-
   const payload = {
-    type: "SUBMIT_RESPONSE",
+    type:"SUBMIT_RESPONSE",
     examId,
-    studentName: nameInput.value,
-    email: emailInput.value,
-    roll: rollInput.value,
+    studentName:nameInput.value,
+    roll:rollInput.value,
+    email:emailInput.value,
     cheated,
     cheatReason,
-    timeTaken,
-    answers: Object.keys(answers).map(qid => ({
-      qid,
-      answer: answers[qid]
-    }))
+    timeTaken:Math.floor((Date.now()-startTime)/1000),
+    answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
   };
 
-  fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify(payload)
-  }).then(() => {
-    document.body.innerHTML =
-      "<h2 style='text-align:center'>Exam submitted successfully</h2>";
+  fetch(API_URL,{method:"POST",body:JSON.stringify(payload)})
+  .then(()=>{
+    document.body.innerHTML="<h2 style='text-align:center'>Exam submitted successfully</h2>";
+    document.exitFullscreen?.();
   });
 }
 </script>
