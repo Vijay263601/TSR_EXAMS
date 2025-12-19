@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MCQ Builder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+  body {
+    font-family: Inter, Arial, sans-serif;
+    background: #f1f5f9;
+    margin: 0;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 700px;
+    margin: auto;
+    background: #ffffff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+  }
+
+  h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #0f172a;
+  }
+
+  label {
+    font-weight: 600;
+    margin-top: 12px;
+    display: block;
+    color: #334155;
+  }
+
+  input, textarea, select {
+    width: 100%;
+    padding: 12px;
+    margin-top: 6px;
+    border-radius: 8px;
+    border: 1px solid #cbd5f5;
+    font-size: 15px;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  .options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #1d4ed8;
+  }
+
+  .status {
+    text-align: center;
+    margin-top: 15px;
+    font-weight: 600;
+  }
+
+  .success {
+    color: green;
+  }
+
+  .error {
+    color: red;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>MCQ Builder</h2>
+
+  <label>Exam ID</label>
+  <input id="examId" placeholder="EXAM_123456">
+
+  <label>Question</label>
+  <textarea id="question" rows="3" placeholder="Enter question here..."></textarea>
+
+  <div class="options">
+    <div>
+      <label>Option A</label>
+      <input id="a" placeholder="Option A">
+    </div>
+    <div>
+      <label>Option B</label>
+      <input id="b" placeholder="Option B">
+    </div>
+    <div>
+      <label>Option C</label>
+      <input id="c" placeholder="Option C">
+    </div>
+    <div>
+      <label>Option D</label>
+      <input id="d" placeholder="Option D">
+    </div>
+  </div>
+
+  <label>Correct Answer</label>
+  <select id="correct">
+    <option value="">Select correct option</option>
+    <option value="A">Option A</option>
+    <option value="B">Option B</option>
+    <option value="C">Option C</option>
+    <option value="D">Option D</option>
+  </select>
+
+  <button onclick="addQuestion()">➕ Add Question</button>
+
+  <div id="status" class="status"></div>
+</div>
+
+<script>
+const API_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
+
+function addQuestion() {
+  const status = document.getElementById("status");
+
+  if (!examId.value || !question.value || !a.value || !b.value || !c.value || !d.value || !correct.value) {
+    status.innerHTML = "⚠ Please fill all fields";
+    status.className = "status error";
+    return;
+  }
+
+  const data = {
+    type: "ADD_QUESTION",
+    examId: examId.value,
+    qid: "Q_" + Date.now(),
+    question: question.value,
+    a: a.value,
+    b: b.value,
+    c: c.value,
+    d: d.value,
+    correct: correct.value
+  };
+
+  fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify(data)
+  })
+  .then(() => {
+    status.innerHTML = "✅ Question added successfully";
+    status.className = "status success";
+    question.value = a.value = b.value = c.value = d.value = "";
+    correct.value = "";
+  })
+  .catch(() => {
+    status.innerHTML = "❌ Error adding question";
+    status.className = "status error";
+  });
+}
+</script>
+
+</body>
+</html>
