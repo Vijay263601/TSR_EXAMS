@@ -1,0 +1,25 @@
+<input id="examName" placeholder="Exam Name">
+<input id="duration" placeholder="Duration (min)">
+<button onclick="createExam()">Create Exam</button>
+
+<script>
+const API = "YOUR_WEB_APP_URL";
+
+function createExam() {
+  const examId = "EXAM_" + Date.now();
+
+  fetch(API, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "CREATE_EXAM",
+      examId,
+      teacher: "teacher@email.com",
+      examName: examName.value,
+      duration: duration.value,
+      maxTabSwitch: 2
+    })
+  });
+
+  alert("Exam created!\nLink: exam.html?examId=" + examId);
+}
+</script>
