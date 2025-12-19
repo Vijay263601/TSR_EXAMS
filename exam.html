@@ -62,6 +62,7 @@ button.secondary {
 <!-- ================= STUDENT DETAILS ================= -->
 <div class="container" id="studentForm">
   <h2>Student Details</h2>
+  <p><b>⚠ Fullscreen is mandatory. Exiting fullscreen will terminate the exam.</b></p>
   <input id="nameInput" placeholder="Full Name">
   <input id="emailInput" type="email" placeholder="Email">
   <input id="rollInput" placeholder="Roll Number">
@@ -110,16 +111,41 @@ let current = 0;
 let cheated = false;
 let cheatReason = "";
 let tabSwitches = 0;
+let mobileWarnings = 0;
 
 let MAX_TAB_SWITCH = 2;
 let duration = 0;
 let timerInterval;
 let startTime = 0;
+let fullscreenActive = false;
+
+/* ---------- FULLSCREEN HELPERS ---------- */
+function enterFullscreen() {
+  const el = document.documentElement;
+  if (el.requestFullscreen) return el.requestFullscreen();
+  if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+  if (el.msRequestFullscreen) return el.msRequestFullscreen();
+}
+
+function isFullscreen() {
+  return document.fullscreenElement ||
+         document.webkitFullscreenElement ||
+         document.msFullscreenElement;
+}
 
 /* ---------- START EXAM ---------- */
 async function startExam() {
   if (!nameInput.value || !emailInput.value || !rollInput.value) {
     alert("Please fill all details");
+    return;
+  }
+
+  // 🔒 Force fullscreen
+  try {
+    await enterFullscreen();
+    fullscreenActive = true;
+  } catch {
+    alert("Fullscreen permission is required to start the exam");
     return;
   }
 
@@ -183,7 +209,7 @@ function renderQuestion() {
   });
 }
 
-/* ---------- NAVIGATION ---------- */
+/* ---------- NAV ---------- */
 function next() {
   if (current < questions.length - 1) {
     current++;
@@ -204,34 +230,60 @@ function startTimer() {
     timerEl.textContent = ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
     t--;
     if (t < 0) {
-      cheatReason ||= "Time up";
+      cheatReason = "Time up";
       submitExam();
     }
   }, 1000);
 }
 
-/* ---------- ANTI CHEAT ---------- */
+/* ---------- FULLSCREEN EXIT DETECTION ---------- */
+document.addEventListener("fullscreenchange", () => {
+  if (!fullscreenActive || examPage.classList.contains("hidden")) return;
+  if (!isFullscreen()) {
+    cheated = true;
+    cheatReason = "Exited fullscreen mode";
+    alert("Fullscreen exit detected. Exam terminated.");
+    submitExam();
+  }
+});
+
+/* ---------- TAB / APP SWITCH (DESKTOP + MOBILE) ---------- */
 document.addEventListener("visibilitychange", () => {
   if (examPage.classList.contains("hidden")) return;
 
   if (document.hidden) {
+    mobileWarnings++;
     tabSwitches++;
-    if (tabSwitches > MAX_TAB_SWITCH) {
+
+    if (tabSwitches > MAX_TAB_SWITCH || mobileWarnings >= 2) {
       cheated = true;
-      cheatReason = "Exceeded tab switch limit";
-      alert("Exam terminated due to cheating");
+      cheatReason = "App/tab switched during exam";
       submitExam();
     }
   }
+});
+
+/* ---------- WINDOW BLUR (MOBILE STRONG SIGNAL) ---------- */
+window.addEventListener("blur", () => {
+  if (examPage.classList.contains("hidden")) return;
+  cheated = true;
+  cheatReason = "Window lost focus";
+  submitExam();
 });
 
 /* ---------- PAGE REFRESH / CLOSE ---------- */
 window.addEventListener("beforeunload", () => {
   if (!cheated && !examPage.classList.contains("hidden")) {
     cheated = true;
-    cheatReason = "Page refresh / tab closed";
+    cheatReason = "Page refreshed or closed";
   }
 });
+
+/* ---------- BLOCK COPY / LONG PRESS ---------- */
+document.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("copy", e => e.preventDefault());
+document.addEventListener("paste", e => e.preventDefault());
+document.addEventListener("cut", e => e.preventDefault());
 
 /* ---------- SUBMIT ---------- */
 function submitExam() {
