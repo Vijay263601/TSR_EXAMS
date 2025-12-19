@@ -1,24 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Teacher Exam Generator</title>
+  <title>Teacher Dashboard</title>
   <style>
-    body { font-family: Arial; padding: 30px; }
-    input, button { padding: 10px; margin: 8px 0; width: 300px; }
+    body {
+      font-family: Arial;
+      padding: 30px;
+      background: #f1f5f9;
+    }
+    .box {
+      max-width: 400px;
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 15px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .success { color: green; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
   </style>
 </head>
 
 <body>
 
-<h2>Create New Exam</h2>
+<div class="box">
+  <h2>Teacher Login & Exam Creation</h2>
 
-<input id="teacherEmail" placeholder="Teacher Email"><br>
-<input id="examName" placeholder="Exam Name"><br>
-<input id="duration" placeholder="Duration (minutes)"><br>
+  <input id="teacherEmail" placeholder="Teacher Email">
+  <input id="teacherPassword" type="password" placeholder="Password">
+  <input id="examName" placeholder="Exam Name">
+  <input id="duration" placeholder="Duration (minutes)">
 
-<button onclick="createExam()">Create Exam</button>
+  <button onclick="createExam()">Create Exam</button>
 
-<p id="result"></p>
+  <button onclick="openBuilder()">Open MCQ Builder</button>
+
+  <p id="result"></p>
+</div>
 
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF-lNlO2HBP_5s-32sTjDRudaOujV8KkrIsmC5yw3u/exec";
@@ -26,26 +58,49 @@ const API_URL = "https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF
 function createExam() {
   const examId = "EXAM_" + Date.now();
 
-  const data = {
+  const payload = {
     type: "CREATE_EXAM",
     examId: examId,
-    teacher: document.getElementById("teacherEmail").value,
-    examName: document.getElementById("examName").value,
-    duration: document.getElementById("duration").value,
+    teacher: teacherEmail.value.trim(),
+    password: teacherPassword.value.trim(),
+    examName: examName.value.trim(),
+    duration: duration.value.trim(),
     maxTabSwitch: 2
   };
-<input id="teacherPassword" type="password" placeholder="Password"><br>
 
   fetch(API_URL, {
     method: "POST",
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
   })
-  .then(() => {
-    document.getElementById("result").innerHTML =
-      "✅ Exam Created!<br><br>" +
-      "Student Exam Link:<br>" +
+  .then(r => r.json())
+  .then(res => {
+    if (res.error) {
+      result.innerHTML = "❌ Login failed";
+      result.className = "error";
+      return;
+    }
+
+    localStorage.setItem("teacherToken", res.token);
+    localStorage.setItem("lastExamId", examId);
+
+    result.innerHTML =
+      "✅ Exam Created<br><br>" +
+      "Student Link:<br>" +
       `<b>exam.html?examId=${examId}</b>`;
+    result.className = "success";
+  })
+  .catch(() => {
+    result.innerHTML = "❌ Server error";
+    result.className = "error";
   });
+}
+
+function openBuilder() {
+  if (!localStorage.getItem("teacherToken")) {
+    alert("Please login and create exam first");
+    return;
+  }
+  window.location.href = "mcq-builder.html";
 }
 </script>
 
