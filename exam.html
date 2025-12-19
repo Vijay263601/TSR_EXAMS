@@ -6,208 +6,247 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-  body {
-    font-family: Inter, Arial, sans-serif;
-    background: #f1f5f9;
-    margin: 0;
-    padding: 20px;
-  }
+body {
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  padding: 20px;
+}
 
-  .container {
-    max-width: 800px;
-    margin: auto;
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-  }
+.container {
+  max-width: 800px;
+  margin: auto;
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+}
 
-  .topbar {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
+.hidden { display: none; }
 
-  .timer {
-    font-weight: 700;
-    color: #dc2626;
-  }
+h2 { text-align: center; }
 
-  .question {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 15px;
-  }
+input {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid #cbd5f5;
+}
 
-  .option {
-    padding: 12px;
-    border: 1px solid #cbd5f5;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    cursor: pointer;
-  }
+.timer {
+  color: #dc2626;
+  font-weight: bold;
+}
 
-  .option.selected {
-    background: #2563eb;
-    color: white;
-  }
+.option {
+  padding: 12px;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
 
-  button {
-    padding: 12px 20px;
-    margin-top: 20px;
-    border: none;
-    border-radius: 8px;
-    background: #2563eb;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-  }
+.option.selected {
+  background: #2563eb;
+  color: white;
+}
 
-  button.secondary {
-    background: #64748b;
-    margin-right: 10px;
-  }
+button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #64748b;
+  margin-right: 8px;
+}
 </style>
 </head>
 
 <body>
 
-<div class="container">
-  <div class="topbar">
-    <div><b>Exam:</b> <span id="examIdText"></span></div>
-    <div class="timer" id="timer">00:00</div>
+<!-- ================= STUDENT DETAILS ================= -->
+<div class="container" id="studentForm">
+  <h2>Student Details</h2>
+  <input id="nameInput" placeholder="Full Name">
+  <input id="emailInput" type="email" placeholder="Email">
+  <input id="rollInput" placeholder="Roll Number">
+  <button onclick="startExam()">Start Exam</button>
+</div>
+
+<!-- ================= EXAM PAGE ================= -->
+<div class="container hidden" id="examPage">
+  <div>
+    Exam ID: <span id="examIdText"></span>
+    <span class="timer" id="timer"></span>
   </div>
 
-  <div class="question" id="questionText">Loading...</div>
-
+  <h3 id="questionText">Loading...</h3>
   <div id="options"></div>
 
-  <div>
-    <button class="secondary" onclick="prev()">Previous</button>
-    <button onclick="next()">Next</button>
-    <button onclick="submitExam()">Submit</button>
-  </div>
+  <button class="secondary" onclick="prev()">Previous</button>
+  <button onclick="next()">Next</button>
+  <button onclick="submitExam()">Submit</button>
 </div>
 
 <script>
 /* ================= CONFIG ================= */
 const API_URL = "https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF-lNlO2HBP_5s-32sTjDRudaOujV8KkrIsmC5yw3u/exec";
-const MAX_TAB_SWITCH = 2;
-const EXAM_DURATION_MINUTES = 30;
 /* ========================================= */
 
-const urlParams = new URLSearchParams(window.location.search);
-const examId = urlParams.get("examId");
+const examId = new URLSearchParams(window.location.search).get("examId");
+document.getElementById("examIdText").textContent = examId;
 
-document.getElementById("examIdText").innerText = examId;
+/* ---------- DOM ---------- */
+const studentForm = document.getElementById("studentForm");
+const examPage = document.getElementById("examPage");
+const questionText = document.getElementById("questionText");
+const optionsDiv = document.getElementById("options");
+const timerEl = document.getElementById("timer");
 
+const nameInput = document.getElementById("nameInput");
+const emailInput = document.getElementById("emailInput");
+const rollInput = document.getElementById("rollInput");
+
+/* ---------- STATE ---------- */
 let questions = [];
-let current = 0;
 let answers = {};
+let current = 0;
 let cheated = false;
 let tabSwitches = 0;
+let MAX_TAB_SWITCH = 2;
+let duration = 0;
+let timerInterval;
 
-/* ---------- Anti Cheat ---------- */
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    tabSwitches++;
-    if (tabSwitches > MAX_TAB_SWITCH) {
-      cheated = true;
-      alert("Exam terminated due to cheating");
-      submitExam();
-    }
+/* ---------- START EXAM ---------- */
+async function startExam() {
+  if (!nameInput.value || !emailInput.value || !rollInput.value) {
+    alert("Please fill all details");
+    return;
   }
-});
 
-/* ---------- Timer ---------- */
-let timeLeft = EXAM_DURATION_MINUTES * 60;
-const timerInterval = setInterval(() => {
-  const m = Math.floor(timeLeft / 60);
-  const s = timeLeft % 60;
-  document.getElementById("timer").innerText =
-    `${m}:${s < 10 ? "0" : ""}${s}`;
-  timeLeft--;
+  studentForm.classList.add("hidden");
+  examPage.classList.remove("hidden");
 
-  if (timeLeft < 0) {
-    alert("Time up! Submitting exam.");
-    submitExam();
-  }
-}, 1000);
+  const [config, qs] = await Promise.all([
+    fetchConfig(),
+    fetchQuestions()
+  ]);
 
-/* ---------- Load Questions ---------- */
-fetch(API_URL, {
-  method: "POST",
-  body: JSON.stringify({
-    type: "GET_QUESTIONS",
-    examId: examId
-  })
-})
-.then(res => res.json())
-.then(data => {
-  questions = data;
-  showQuestion();
-});
+  duration = config.duration;
+  MAX_TAB_SWITCH = config.maxTabSwitch;
+  questions = qs;
 
-/* ---------- Render Question ---------- */
-function showQuestion() {
+  renderQuestion();
+  startTimer();
+}
+
+/* ---------- FETCH CONFIG ---------- */
+async function fetchConfig() {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({ type: "GET_EXAM_CONFIG", examId })
+  });
+  return res.json();
+}
+
+/* ---------- FETCH QUESTIONS ---------- */
+async function fetchQuestions() {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({ type: "GET_QUESTIONS", examId })
+  });
+  return res.json();
+}
+
+/* ---------- RENDER QUESTION ---------- */
+function renderQuestion() {
   const q = questions[current];
   if (!q) return;
 
-  document.getElementById("questionText").innerText =
-    `Q${current + 1}. ${q.question}`;
-
-  const optionsDiv = document.getElementById("options");
+  questionText.textContent = `Q${current + 1}. ${q.question}`;
   optionsDiv.innerHTML = "";
 
-  ["A", "B", "C", "D"].forEach(opt => {
+  ["A","B","C","D"].forEach(opt => {
     const div = document.createElement("div");
     div.className = "option";
-    div.innerText = q[opt];
+    div.textContent = q[opt];
+
     if (answers[q.qid] === opt) div.classList.add("selected");
 
     div.onclick = () => {
       answers[q.qid] = opt;
-      showQuestion();
+      document.querySelectorAll(".option")
+        .forEach(o => o.classList.remove("selected"));
+      div.classList.add("selected");
     };
 
     optionsDiv.appendChild(div);
   });
 }
 
+/* ---------- NAVIGATION ---------- */
 function next() {
   if (current < questions.length - 1) {
     current++;
-    showQuestion();
+    renderQuestion();
   }
 }
-
 function prev() {
   if (current > 0) {
     current--;
-    showQuestion();
+    renderQuestion();
   }
 }
 
-/* ---------- Submit Exam ---------- */
+/* ---------- TIMER ---------- */
+function startTimer() {
+  let t = duration * 60;
+  timerInterval = setInterval(() => {
+    timerEl.textContent =
+      ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+    t--;
+    if (t < 0) {
+      clearInterval(timerInterval);
+      submitExam();
+    }
+  }, 1000);
+}
+
+/* ---------- ANTI CHEAT ---------- */
+document.addEventListener("visibilitychange", () => {
+  if (examPage.classList.contains("hidden")) return;
+  if (document.hidden && ++tabSwitches > MAX_TAB_SWITCH) {
+    cheated = true;
+    submitExam();
+  }
+});
+
+/* ---------- SUBMIT ---------- */
 function submitExam() {
   clearInterval(timerInterval);
 
-  const answerArray = Object.keys(answers).map(qid => ({
-    qid: qid,
-    answer: answers[qid]
-  }));
+  const payload = {
+    type: "SUBMIT_RESPONSE",
+    examId,
+    studentName: nameInput.value,
+    email: emailInput.value,
+    roll: rollInput.value,
+    cheated,
+    answers: Object.keys(answers).map(qid => ({
+      qid,
+      answer: answers[qid]
+    }))
+  };
 
   fetch(API_URL, {
     method: "POST",
-    body: JSON.stringify({
-      type: "SUBMIT_RESPONSE",
-      examId: examId,
-      email: "student@email.com",
-      cheated: cheated,
-      answers: answerArray
-    })
-  })
-  .then(() => {
+    body: JSON.stringify(payload)
+  }).then(() => {
     document.body.innerHTML =
       "<h2 style='text-align:center'>Exam submitted successfully</h2>";
   });
