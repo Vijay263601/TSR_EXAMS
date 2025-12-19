@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Teacher Exam Generator</title>
+  <style>
+    body { font-family: Arial; padding: 30px; }
+    input, button { padding: 10px; margin: 8px 0; width: 300px; }
+  </style>
+</head>
+
+<body>
+
+<h2>Create New Exam</h2>
+
+<input id="teacherEmail" placeholder="Teacher Email"><br>
+<input id="examName" placeholder="Exam Name"><br>
+<input id="duration" placeholder="Duration (minutes)"><br>
+
+<button onclick="createExam()">Create Exam</button>
+
+<p id="result"></p>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF-lNlO2HBP_5s-32sTjDRudaOujV8KkrIsmC5yw3u/exec";
+
+function createExam() {
+  const examId = "EXAM_" + Date.now();
+
+  const data = {
+    type: "CREATE_EXAM",
+    examId: examId,
+    teacher: document.getElementById("teacherEmail").value,
+    examName: document.getElementById("examName").value,
+    duration: document.getElementById("duration").value,
+    maxTabSwitch: 2
+  };
+
+  fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify(data)
+  })
+  .then(() => {
+    document.getElementById("result").innerHTML =
+      "✅ Exam Created!<br><br>" +
+      "Student Exam Link:<br>" +
+      `<b>exam.html?examId=${examId}</b>`;
+  });
+}
+</script>
+
+</body>
+</html>
