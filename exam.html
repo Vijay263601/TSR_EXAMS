@@ -4,50 +4,15 @@
 <meta charset="UTF-8">
 <title>Online Exam</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-
 <style>
-body{
-  font-family:Arial;
-  background:#f1f5f9;
-  padding:20px;
-  overscroll-behavior:none;
-  touch-action:none;
-}
-.container{
-  max-width:800px;
-  margin:auto;
-  background:#fff;
-  padding:25px;
-  border-radius:12px;
-}
+body{font-family:Arial;background:#f1f5f9;padding:20px}
+.container{max-width:800px;margin:auto;background:#fff;padding:25px;border-radius:12px}
 .hidden{display:none}
-.option{
-  border:1px solid #ccc;
-  padding:10px;
-  margin:8px 0;
-  cursor:pointer;
-}
-.option.selected{
-  background:#2563eb;
-  color:#fff;
-}
-.timer{
-  color:red;
-  font-weight:bold;
-}
-input{
-  display:block;
-  width:100%;
-  padding:10px;
-  margin:10px 0;
-}
-button{
-  padding:10px 15px;
-  margin-top:10px;
-}
+.option{border:1px solid #ccc;padding:10px;margin:8px 0;cursor:pointer}
+.option.selected{background:#2563eb;color:#fff}
+.timer{color:red;font-weight:bold}
 </style>
 </head>
-
 <body>
 
 <div class="container" id="studentForm">
@@ -59,74 +24,46 @@ button{
 </div>
 
 <div class="container hidden" id="examPage">
-<div>
-  Exam: <span id="examIdText"></span>
-  <span class="timer" id="timer"></span>
-</div>
-
+<div>Exam: <span id="examIdText"></span> <span class="timer" id="timer"></span></div>
 <h3 id="questionText"></h3>
 <div id="options"></div>
-
 <button onclick="prev()">Prev</button>
 <button onclick="next()">Next</button>
 <button onclick="submitExam()">Submit</button>
 </div>
 
 <script>
-const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
-
+const API_URL="https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF-lNlO2HBP_5s-32sTjDRudaOujV8KkrIsmC5yw3u/exec";
 const examId=new URLSearchParams(location.search).get("examId");
 examIdText.textContent=examId;
 
 let questions=[],answers={},current=0;
 let cheated=false,cheatReason="",examFinished=false;
 let duration=0,MAX_TAB_SWITCH=2,tabSwitch=0;
-let startTime,interval;
+let startTime,interval,fullscreen=true;
 let w0=0,h0=0;
-let securityActive=false;   // ✅ IMPORTANT FLAG
 
-/* ================= START EXAM ================= */
 async function startExam(){
- if(!nameInput.value||!emailInput.value||!rollInput.value){
-  alert("Fill all details");return;
- }
-
+ if(!nameInput.value||!emailInput.value||!rollInput.value)return alert("Fill all");
+ try{await document.documentElement.requestFullscreen()}catch{return alert("Fullscreen required")}
  studentForm.classList.add("hidden");
  examPage.classList.remove("hidden");
 
- w0=innerWidth; h0=innerHeight;
+ w0=innerWidth;h0=innerHeight;
 
  const [cfg,qs]=await Promise.all([
   fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})}).then(r=>r.json()),
   fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})}).then(r=>r.json())
  ]);
 
- duration=Number(cfg.duration);
- MAX_TAB_SWITCH=Number(cfg.maxTabSwitch);
- questions=qs;
-
- if(!questions.length || !duration){
-  alert("Exam data error");
-  location.reload();
-  return;
- }
-
- try{ await document.documentElement.requestFullscreen(); }catch{}
-
- startTime=Date.now();
- securityActive=true;   // ✅ SECURITY STARTS HERE
- render();
- startTimer();
+ duration=cfg.duration;MAX_TAB_SWITCH=cfg.maxTabSwitch;questions=qs;
+ startTime=Date.now();render();startTimer();
 }
 
-/* ================= RENDER ================= */
 function render(){
- const q=questions[current];
- if(!q)return;
-
+ const q=questions[current];if(!q)return;
  questionText.textContent=`Q${current+1}. ${q.question}`;
  options.innerHTML="";
-
  ["A","B","C","D"].forEach(o=>{
   const d=document.createElement("div");
   d.className="option"+(answers[q.qid]===o?" selected":"");
@@ -135,121 +72,46 @@ function render(){
   options.appendChild(d);
  });
 }
+function next(){if(current<questions.length-1){current++;render()}}
+function prev(){if(current>0){current--;render()}}
 
-function next(){ if(current<questions.length-1){current++;render()} }
-function prev(){ if(current>0){current--;render()} }
-
-/* ================= TIMER ================= */
 function startTimer(){
  let t=duration*60;
  interval=setInterval(()=>{
   timer.textContent=` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-  if(--t<0){
-   cheated=true;
-   cheatReason="Time up";
-   submitExam();
-  }
+  if(--t<0){cheatReason="Time up";submitExam()}
  },1000);
 }
 
-/* ================= SECURITY (ONLY AFTER START) ================= */
-
 document.addEventListener("fullscreenchange",()=>{
- if(!securityActive||examFinished)return;
- if(!document.fullscreenElement){
-  cheated=true;
-  cheatReason="Exited fullscreen";
-  submitExam();
- }
+ if(examFinished)return;
+ if(!document.fullscreenElement){cheated=true;cheatReason="Exited fullscreen";submitExam()}
 });
-
 document.addEventListener("visibilitychange",()=>{
- if(!securityActive||examFinished||!document.hidden)return;
- if(++tabSwitch>MAX_TAB_SWITCH){
-  cheated=true;
-  cheatReason="Tab switched";
-  submitExam();
- }
+ if(examFinished||!document.hidden)return;
+ if(++tabSwitch>MAX_TAB_SWITCH){cheated=true;cheatReason="Tab switch";submitExam()}
 });
-
-window.addEventListener("blur",()=>{
- if(!securityActive||examFinished)return;
- cheated=true;
- cheatReason="Window focus lost";
- submitExam();
-});
-
 addEventListener("resize",()=>{
- if(!securityActive||examFinished)return;
+ if(examFinished)return;
  if(Math.abs(innerWidth-w0)>100||Math.abs(innerHeight-h0)>100){
-  cheated=true;
-  cheatReason="Split screen detected";
-  submitExam();
+  cheated=true;cheatReason="Split screen detected";submitExam();
  }
 });
 
-history.pushState(null,null,location.href);
-window.onpopstate=()=>{
- if(!securityActive)return;
- cheated=true;
- cheatReason="Back navigation";
- submitExam();
-};
-
-document.addEventListener("contextmenu",e=>{
- if(securityActive) e.preventDefault();
-});
-
-document.addEventListener("keydown",e=>{
- if(!securityActive)return;
- if(
-  e.key==="Escape"||
-  e.key==="F5"||
-  e.key==="F11"||
-  e.key==="Tab"||
-  e.altKey||
-  e.ctrlKey||
-  e.metaKey
- ){
-  e.preventDefault();
-  cheated=true;
-  cheatReason="Blocked key used";
-  submitExam();
- }
-});
-
-window.addEventListener("beforeunload",e=>{
- if(!securityActive)return;
- e.preventDefault();
- e.returnValue="";
-});
-
-/* ================= SUBMIT ================= */
 function submitExam(){
  if(examFinished)return;
- examFinished=true;
- securityActive=false;
- clearInterval(interval);
-
- fetch(API_URL,{
-  method:"POST",
-  body:JSON.stringify({
-   type:"SUBMIT_RESPONSE",
-   examId,
-   studentName:nameInput.value,
-   roll:rollInput.value,
-   email:emailInput.value,
-   cheated,
-   cheatReason,
-   timeTaken:Math.floor((Date.now()-startTime)/1000),
-   answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
-  })
- }).then(()=>{
-  document.body.innerHTML="<h2>Exam Submitted</h2>";
-  if(document.fullscreenElement) document.exitFullscreen();
- });
+ examFinished=true;clearInterval(interval);
+ fetch(API_URL,{method:"POST",body:JSON.stringify({
+  type:"SUBMIT_RESPONSE",
+  examId,
+  studentName:nameInput.value,
+  roll:rollInput.value,
+  email:emailInput.value,
+  cheated,cheatReason,
+  timeTaken:Math.floor((Date.now()-startTime)/1000),
+  answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
+ })}).then(()=>{document.body.innerHTML="<h2>Exam Submitted</h2>";document.exitFullscreen()});
 }
 </script>
-
 </body>
 </html>
