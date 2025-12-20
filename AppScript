@@ -1,0 +1,154 @@
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    /* ================= CREATE EXAM ================= */
+    if (data.type === "CREATE_EXAM") {
+      ss.getSheetByName("Exams").appendRow([
+        clean(data.examId),
+        data.teacher,
+        data.examName,
+        Number(data.duration),
+        Number(data.maxTabSwitch),
+        new Date()
+      ]);
+      return json({ status: "EXAM_CREATED" });
+    }
+
+    /* ================= GET EXAM CONFIG ================= */
+    if (data.type === "GET_EXAM_CONFIG") {
+      const sheet = ss.getSheetByName("Exams");
+      const rows = sheet.getDataRange().getValues();
+
+      for (let i = 1; i < rows.length; i++) {
+        if (clean(rows[i][0]) === clean(data.examId)) {
+          return json({
+            duration: Number(rows[i][3]),
+            maxTabSwitch: Number(rows[i][4])
+          });
+        }
+      }
+      return json({ error: "Exam not found" });
+    }
+
+    /* ================= ADD QUESTION ================= */
+    if (data.type === "ADD_QUESTION") {
+      ss.getSheetByName("Questions").appendRow([
+        clean(data.examId),
+        clean(data.qid),
+        data.question,
+        data.a,
+        data.b,
+        data.c,
+        data.d,
+        data.correct
+      ]);
+      return json({ status: "QUESTION_ADDED" });
+    }
+
+    /* ================= GET QUESTIONS (FIXED) ================= */
+    if (data.type === "GET_QUESTIONS") {
+      const sheet = ss.getSheetByName("Questions");
+      const rows = sheet.getDataRange().getValues();
+      const examId = clean(data.examId);
+      const questions = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        if (clean(rows[i][0]) === examId) {
+          questions.push({
+            qid: rows[i][1],
+            question: rows[i][2],
+            A: rows[i][3],
+            B: rows[i][4],
+            C: rows[i][5],
+            D: rows[i][6]
+          });
+        }
+      }
+
+      // 🔑 ALWAYS return an array
+      return json(questions);
+    }
+
+    /* ================= SUBMIT RESPONSE ================= */
+    if (data.type === "SUBMIT_RESPONSE") {
+      const qSheet = ss.getSheetByName("Questions");
+      const rSheet = ss.getSheetByName("Responses");
+      const cSheet = ss.getSheetByName("Cheating_Log");
+
+      const qRows = qSheet.getDataRange().getValues();
+      const correctMap = {};
+      const qIds = [];
+      const examId = clean(data.examId);
+
+      // Build correct answer map
+      for (let i = 1; i < qRows.length; i++) {
+        if (clean(qRows[i][0]) === examId) {
+          correctMap[qRows[i][1]] = qRows[i][7];
+          qIds.push(qRows[i][1]);
+        }
+      }
+
+      let correct = 0;
+      let wrong = 0;
+
+      (data.answers || []).forEach(a => {
+        if (correctMap[a.qid] === a.answer) correct++;
+        else wrong++;
+      });
+
+      const now = new Date();
+
+      // ✅ MAIN RESPONSE (ONE ROW)
+      rSheet.appendRow([
+        now,
+        examId,
+        data.studentName,
+        data.roll,
+        data.email,
+        qIds.length,
+        correct,
+        wrong,
+        qIds.join(","),
+        data.cheated ? "YES" : "NO",
+        data.timeTaken || ""
+      ]);
+
+      // 🚨 CHEATING LOG (ONLY IF CHEATED)
+      if (data.cheated) {
+        cSheet.appendRow([
+          now,
+          examId,
+          data.studentName,
+          data.roll,
+          data.email,
+          data.cheatReason || "Suspicious behaviour"
+        ]);
+      }
+
+      return json({
+        status: "SUBMITTED",
+        correct,
+        wrong
+      });
+    }
+
+    return json({ error: "INVALID_REQUEST" });
+
+  } catch (err) {
+    return json({ error: err.toString() });
+  }
+}
+
+/* ================= HELPERS ================= */
+
+function json(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function clean(v) {
+  return String(v || "").trim();
+}
