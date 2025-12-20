@@ -88,11 +88,11 @@ button:hover{ background:#1d4ed8 }
   <input id="examId" placeholder="EXAM_123456">
 
   <label>Question</label>
-  <textarea id="question" rows="3" placeholder="Enter question here..."></textarea>
+  <textarea id="question" rows="3"></textarea>
 
-  <!-- IMAGE URL -->
+  <!-- DIRECT IMAGE UPLOAD -->
   <label>Question Image (optional)</label>
-  <input id="imageUrl" placeholder="Paste image URL (Google Drive / Imgur)">
+  <input type="file" id="imageFile" accept="image/*">
   <div class="preview" id="preview"></div>
 
   <div class="options">
@@ -131,12 +131,19 @@ button:hover{ background:#1d4ed8 }
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
 
-/* IMAGE PREVIEW */
-imageUrl.addEventListener("input",()=>{
-  const url=imageUrl.value.trim();
-  preview.innerHTML = url
-    ? `<img src="${url}" onerror="this.style.display='none'">`
-    : "";
+let imageBase64 = "";
+
+/* IMAGE PREVIEW + BASE64 */
+imageFile.addEventListener("change",()=>{
+  const file=imageFile.files[0];
+  if(!file) return;
+
+  const reader=new FileReader();
+  reader.onload=()=>{
+    imageBase64 = reader.result; // base64
+    preview.innerHTML = `<img src="${imageBase64}">`;
+  };
+  reader.readAsDataURL(file);
 });
 
 function addQuestion(){
@@ -153,7 +160,7 @@ function addQuestion(){
     examId:examId.value,
     qid:"Q_"+Date.now(),
     question:question.value,
-    image:imageUrl.value || "",   // ✅ IMAGE FIELD
+    imageBase64:imageBase64, // ✅ DIRECT IMAGE DATA
     a:a.value,
     b:b.value,
     c:c.value,
@@ -168,8 +175,10 @@ function addQuestion(){
   .then(()=>{
     status.textContent="✅ Question added successfully";
     status.className="status success";
-    question.value=a.value=b.value=c.value=d.value=imageUrl.value="";
+    question.value=a.value=b.value=c.value=d.value="";
     correct.value="";
+    imageFile.value="";
+    imageBase64="";
     preview.innerHTML="";
   })
   .catch(()=>{
