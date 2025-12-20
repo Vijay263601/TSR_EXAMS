@@ -51,7 +51,6 @@ input, button{
 
 <body>
 
-<!-- ===== STUDENT FORM ===== -->
 <div class="container" id="studentForm">
   <h2>Student Details</h2>
   <input id="nameInput" placeholder="Name">
@@ -60,7 +59,6 @@ input, button{
   <button onclick="startExam()">Start Exam</button>
 </div>
 
-<!-- ===== EXAM PAGE ===== -->
 <div class="container hidden" id="examPage">
   <div>
     Exam: <span id="examIdText"></span>
@@ -77,158 +75,109 @@ input, button{
 
 <script>
 /* ================= CONFIG ================= */
-const API_URL = "https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
-const examId = new URLSearchParams(location.search).get("examId");
-document.getElementById("examIdText").innerText = examId;
+const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
+const examId=new URLSearchParams(location.search).get("examId");
+document.getElementById("examIdText").innerText=examId;
+
+/* ================= DEVICE ================= */
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
 
 /* ================= STATE ================= */
-let questions = [];
-let answers = {};
-let current = 0;
-let duration = 0;
-let timerInterval;
-let startTime;
-
-let examStarted = false;
-let examFinished = false;
+let questions=[],answers={},current=0;
+let duration=0,timerInterval,startTime;
+let examStarted=false,examFinished=false;
 
 /* ================= START EXAM ================= */
 async function startExam(){
-  if(!nameInput.value || !emailInput.value || !rollInput.value){
-    alert("Fill all details");
-    return;
+  if(!nameInput.value||!emailInput.value||!rollInput.value){
+    alert("Fill all details"); return;
   }
 
   studentForm.classList.add("hidden");
   examPage.classList.remove("hidden");
 
   try{
-    const cfgRes = await fetch(API_URL,{
-      method:"POST",
-      body: JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
-    });
-    const cfg = JSON.parse(await cfgRes.text());
+    const cfgRes=await fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})});
+    const cfg=JSON.parse(await cfgRes.text());
 
-    const qRes = await fetch(API_URL,{
-      method:"POST",
-      body: JSON.stringify({ type:"GET_QUESTIONS", examId })
-    });
-    questions = JSON.parse(await qRes.text());
+    const qRes=await fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})});
+    questions=JSON.parse(await qRes.text());
 
-    duration = Number(cfg.duration);
-
-    if(!questions.length || !duration){
-      alert("Exam data error");
-      return;
-    }
-  }catch(err){
-    console.error(err);
-    alert("Server error. Try again.");
-    return;
-  }
-
-  /* Fullscreen REQUIRED */
-  try{
-    await document.documentElement.requestFullscreen();
+    duration=Number(cfg.duration);
+    if(!questions.length||!duration) throw "Invalid exam";
   }catch{
-    alert("Fullscreen required");
-    location.reload();
-    return;
+    alert("Exam load error"); return;
   }
 
-  examStarted = true;
-  startTime = Date.now();
+  /* Fullscreen (desktop strict, android best-effort) */
+  try{ await document.documentElement.requestFullscreen(); }catch{}
 
+  examStarted=true;
+  startTime=Date.now();
   render();
   startTimer();
 }
 
 /* ================= RENDER ================= */
 function render(){
-  const q = questions[current];
-  if(!q) return;
-
-  questionText.innerText = `Q${current+1}. ${q.question}`;
-  options.innerHTML = "";
-
+  const q=questions[current]; if(!q)return;
+  questionText.innerText=`Q${current+1}. ${q.question}`;
+  options.innerHTML="";
   ["A","B","C","D"].forEach(o=>{
-    const div = document.createElement("div");
-    div.className = "option" + (answers[q.qid]===o ? " selected" : "");
-    div.innerText = q[o];
-    div.onclick = ()=>{
-      answers[q.qid] = o;
-      render();
-    };
-    options.appendChild(div);
+    const d=document.createElement("div");
+    d.className="option"+(answers[q.qid]===o?" selected":"");
+    d.innerText=q[o];
+    d.onclick=()=>{answers[q.qid]=o;render()};
+    options.appendChild(d);
   });
 }
 
-function next(){
-  if(current < questions.length-1){
-    current++;
-    render();
-  }
-}
-
-function prev(){
-  if(current > 0){
-    current--;
-    render();
-  }
-}
+function next(){if(current<questions.length-1){current++;render()}}
+function prev(){if(current>0){current--;render()}}
 
 /* ================= TIMER ================= */
 function startTimer(){
-  let t = duration * 60;
-  timerInterval = setInterval(()=>{
-    timer.innerText =
-      ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-    if(--t < 0){
-      submitExam();
-    }
+  let t=duration*60;
+  timerInterval=setInterval(()=>{
+    timer.innerText=` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+    if(--t<0) submitExam();
   },1000);
 }
 
-/* ================= SECURITY (ONLY 2) ================= */
+/* ================= SECURITY ================= */
 
-/* Fullscreen exit */
-document.addEventListener("fullscreenchange",()=>{
-  if(!examStarted || examFinished) return;
-  if(!document.fullscreenElement){
-    submitExam();
-  }
+/* TAB / APP SWITCH — ALL DEVICES */
+document.addEventListener("visibilitychange",()=>{
+  if(!examStarted||examFinished)return;
+  if(document.hidden) submitExam();
 });
 
-/* Tab / App switch */
-document.addEventListener("visibilitychange",()=>{
-  if(!examStarted || examFinished) return;
-  if(document.hidden){
-    submitExam();
-  }
+/* FULLSCREEN EXIT — DESKTOP ONLY */
+document.addEventListener("fullscreenchange",()=>{
+  if(IS_ANDROID) return; // ❗ ignore android false events
+  if(!examStarted||examFinished)return;
+  if(!document.fullscreenElement) submitExam();
 });
 
 /* ================= SUBMIT ================= */
 function submitExam(){
-  if(examFinished) return;
-  examFinished = true;
+  if(examFinished)return;
+  examFinished=true;
   clearInterval(timerInterval);
 
   fetch(API_URL,{
     method:"POST",
-    body: JSON.stringify({
+    body:JSON.stringify({
       type:"SUBMIT_RESPONSE",
       examId,
       studentName:nameInput.value,
       roll:rollInput.value,
       email:emailInput.value,
       timeTaken:Math.floor((Date.now()-startTime)/1000),
-      answers:Object.keys(answers).map(qid=>({
-        qid,
-        answer:answers[qid]
-      }))
+      answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
     })
   }).finally(()=>{
-    document.body.innerHTML = "<h2>Exam Submitted</h2>";
+    document.body.innerHTML="<h2>Exam Submitted</h2>";
     if(document.fullscreenElement) document.exitFullscreen();
   });
 }
