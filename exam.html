@@ -6,23 +6,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { font-family: Arial, sans-serif; background:#f1f5f9; padding:20px; }
-.container { max-width:800px; margin:auto; background:#fff; padding:25px; border-radius:12px; }
-.hidden { display:none; }
-input { width:100%; padding:12px; margin:8px 0; }
+body{
+  font-family: Arial, sans-serif;
+  background:#f1f5f9;
+  padding:20px;
+}
+.container{
+  max-width:800px;
+  margin:auto;
+  background:#fff;
+  padding:25px;
+  border-radius:12px;
+}
+.hidden{ display:none }
 
-.option {
+input{
+  width:100%;
+  padding:12px;
+  margin:8px 0;
+}
+
+.option{
   padding:12px;
   border:1px solid #cbd5f5;
   margin-bottom:10px;
   cursor:pointer;
   border-radius:8px;
 }
-.option.selected { background:#2563eb; color:#fff; }
+.option.selected{
+  background:#2563eb;
+  color:#fff;
+}
 
-.timer { color:#dc2626; font-weight:bold; }
+.timer{
+  color:#dc2626;
+  font-weight:bold;
+}
 
-button {
+button{
   padding:10px 16px;
   background:#2563eb;
   color:#fff;
@@ -30,9 +51,12 @@ button {
   border-radius:6px;
   cursor:pointer;
 }
-button.secondary { background:#64748b; margin-right:8px; }
+button.secondary{
+  background:#64748b;
+  margin-right:8px;
+}
 
-.question-image {
+.question-image{
   max-width:100%;
   max-height:260px;
   display:block;
@@ -55,7 +79,7 @@ button.secondary { background:#64748b; margin-right:8px; }
   <button onclick="startExam()">Start Exam</button>
 </div>
 
-<!-- EXAM -->
+<!-- EXAM PAGE -->
 <div class="container hidden" id="examPage">
   <div>
     Exam ID: <span id="examIdText"></span>
@@ -64,7 +88,7 @@ button.secondary { background:#64748b; margin-right:8px; }
 
   <h3 id="questionText"></h3>
 
-  <!-- IMAGE PLACEHOLDER -->
+  <!-- IMAGE -->
   <img id="questionImage" class="question-image hidden">
 
   <div id="options"></div>
@@ -75,20 +99,26 @@ button.secondary { background:#64748b; margin-right:8px; }
 </div>
 
 <script>
-/* CONFIG */
+/* ================= CONFIG ================= */
 const API_URL = "https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
 const examId = new URLSearchParams(location.search).get("examId");
-examIdText.textContent = examId;
+document.getElementById("examIdText").textContent = examId;
 
-/* STATE */
-let questions = [], answers = {}, current = 0;
-let cheated = false, cheatReason = "";
-let examFinished = false;
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+
+/* ================= STATE ================= */
+let questions = [];
+let answers = {};
+let current = 0;
 let duration = 0;
-let timerInterval, startTime;
-let fullscreenActive = false;
+let timerInterval;
+let startTime;
+let examStarted = false;
+let examFinished = false;
+let cheated = false;
+let cheatReason = "";
 
-/* FULLSCREEN */
+/* ================= FULLSCREEN HELPERS ================= */
 function enterFullscreen(){
   const el = document.documentElement;
   return el.requestFullscreen?.() || el.webkitRequestFullscreen?.();
@@ -97,110 +127,70 @@ function isFullscreen(){
   return document.fullscreenElement || document.webkitFullscreenElement;
 }
 
-/* START EXAM */
+/* ================= START EXAM ================= */
 async function startExam(){
   if(!nameInput.value || !emailInput.value || !rollInput.value){
-    alert("Fill all details"); return;
+    alert("Fill all details");
+    return;
   }
 
-  try {
+  /* FULLSCREEN MUST BE TRIGGERED BY CLICK */
+  try{
     await enterFullscreen();
-    fullscreenActive = true;
-  } catch {
-    alert("Fullscreen required"); return;
+  }catch{
+    alert("Fullscreen is required to start the exam");
+    return;
   }
 
   studentForm.classList.add("hidden");
   examPage.classList.remove("hidden");
 
-  const [cfg, qs] = await Promise.all([
-    fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})}).then(r=>r.text()).then(JSON.parse),
-    fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})}).then(r=>r.text()).then(JSON.parse)
-  ]);
+  try{
+    /* GET CONFIG (ANDROID SAFE) */
+    const cfgRes = await fetch(API_URL,{
+      method:"POST",
+      body: JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
+    });
+    const cfg = JSON.parse(await cfgRes.text());
 
-  duration = cfg.duration;
-  questions = qs;
+    /* GET QUESTIONS (ANDROID SAFE) */
+    const qRes = await fetch(API_URL,{
+      method:"POST",
+      body: JSON.stringify({ type:"GET_QUESTIONS", examId })
+    });
+    questions = JSON.parse(await qRes.text());
 
+    duration = Number(cfg.duration);
+
+    if(!questions.length || !duration){
+      alert("Exam data error");
+      submitExam();
+      return;
+    }
+
+  }catch(err){
+    console.error(err);
+    alert("Server error. Try again.");
+    submitExam();
+    return;
+  }
+
+  examStarted = true;
   startTime = Date.now();
   renderQuestion();
   startTimer();
 }
 
-/* RENDER QUESTION */
+/* ================= RENDER ================= */
 function renderQuestion(){
   const q = questions[current];
   if(!q) return;
 
   questionText.textContent = `Q${current+1}. ${q.question}`;
 
-  /* IMAGE RENDER */
+  /* IMAGE SUPPORT */
   const img = document.getElementById("questionImage");
-  if(q.image || q.imageURL){
-    img.src = q.image || q.imageURL;
+  if(q.imageURL){
+    img.src = q.imageURL;
     img.classList.remove("hidden");
   }else{
-    img.classList.add("hidden");
-  }
-
-  options.innerHTML="";
-  ["A","B","C","D"].forEach(o=>{
-    const d=document.createElement("div");
-    d.className="option"+(answers[q.qid]===o?" selected":"");
-    d.textContent=q[o];
-    d.onclick=()=>{ answers[q.qid]=o; renderQuestion(); };
-    options.appendChild(d);
-  });
-}
-
-function next(){ if(current<questions.length-1){ current++; renderQuestion(); } }
-function prev(){ if(current>0){ current--; renderQuestion(); } }
-
-/* TIMER */
-function startTimer(){
-  let t=duration*60;
-  timerInterval=setInterval(()=>{
-    timer.textContent=` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-    if(--t<0){ cheatReason="Time up"; submitExam(); }
-  },1000);
-}
-
-/* ANTI-CHEAT */
-document.addEventListener("fullscreenchange",()=>{
-  if(examFinished || !fullscreenActive) return;
-  if(!isFullscreen()){
-    cheated=true; cheatReason="Exited fullscreen"; submitExam();
-  }
-});
-document.addEventListener("visibilitychange",()=>{
-  if(examFinished || document.hidden===false) return;
-  cheated=true; cheatReason="Tab/app switch"; submitExam();
-});
-
-/* SUBMIT */
-function submitExam(){
-  if(examFinished) return;
-  examFinished = true;
-  clearInterval(timerInterval);
-
-  fetch(API_URL,{
-    method:"POST",
-    body:JSON.stringify({
-      type:"SUBMIT_RESPONSE",
-      examId,
-      studentName:nameInput.value,
-      roll:rollInput.value,
-      email:emailInput.value,
-      cheated,
-      cheatReason,
-      timeTaken:Math.floor((Date.now()-startTime)/1000),
-      answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
-    })
-  }).then(()=>{
-    document.body.innerHTML="<h2 style='text-align:center'>Exam submitted successfully</h2>";
-    document.exitFullscreen?.();
-  });
-}
-</script>
-
-</body>
-</html>
