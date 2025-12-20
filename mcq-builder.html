@@ -6,84 +6,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-  body {
-    font-family: Inter, Arial, sans-serif;
-    background: #f1f5f9;
-    margin: 0;
-    padding: 20px;
-  }
+body{
+  font-family: Inter, Arial, sans-serif;
+  background:#f1f5f9;
+  margin:0;
+  padding:20px;
+}
+.container{
+  max-width:700px;
+  margin:auto;
+  background:#fff;
+  padding:25px;
+  border-radius:12px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.08);
+}
+h2{
+  text-align:center;
+  margin-bottom:20px;
+  color:#0f172a;
+}
+label{
+  font-weight:600;
+  margin-top:12px;
+  display:block;
+  color:#334155;
+}
+input, textarea, select{
+  width:100%;
+  padding:12px;
+  margin-top:6px;
+  border-radius:8px;
+  border:1px solid #cbd5f5;
+  font-size:15px;
+}
+textarea{ resize:vertical }
+.options{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+button{
+  width:100%;
+  margin-top:20px;
+  padding:14px;
+  background:#2563eb;
+  color:white;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+}
+button:hover{ background:#1d4ed8 }
+.status{
+  text-align:center;
+  margin-top:15px;
+  font-weight:600;
+}
+.success{ color:green }
+.error{ color:red }
 
-  .container {
-    max-width: 700px;
-    margin: auto;
-    background: #ffffff;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-  }
-
-  h2 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #0f172a;
-  }
-
-  label {
-    font-weight: 600;
-    margin-top: 12px;
-    display: block;
-    color: #334155;
-  }
-
-  input, textarea, select {
-    width: 100%;
-    padding: 12px;
-    margin-top: 6px;
-    border-radius: 8px;
-    border: 1px solid #cbd5f5;
-    font-size: 15px;
-  }
-
-  textarea {
-    resize: vertical;
-  }
-
-  .options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  button {
-    width: 100%;
-    margin-top: 20px;
-    padding: 14px;
-    background: #2563eb;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  button:hover {
-    background: #1d4ed8;
-  }
-
-  .status {
-    text-align: center;
-    margin-top: 15px;
-    font-weight: 600;
-  }
-
-  .success {
-    color: green;
-  }
-
-  .error {
-    color: red;
-  }
+.preview{
+  margin-top:10px;
+  text-align:center;
+}
+.preview img{
+  max-width:100%;
+  max-height:200px;
+  border-radius:10px;
+  border:1px solid #e5e7eb;
+}
 </style>
 </head>
 
@@ -98,22 +90,27 @@
   <label>Question</label>
   <textarea id="question" rows="3" placeholder="Enter question here..."></textarea>
 
+  <!-- IMAGE URL -->
+  <label>Question Image (optional)</label>
+  <input id="imageUrl" placeholder="Paste image URL (Google Drive / Imgur)">
+  <div class="preview" id="preview"></div>
+
   <div class="options">
     <div>
       <label>Option A</label>
-      <input id="a" placeholder="Option A">
+      <input id="a">
     </div>
     <div>
       <label>Option B</label>
-      <input id="b" placeholder="Option B">
+      <input id="b">
     </div>
     <div>
       <label>Option C</label>
-      <input id="c" placeholder="Option C">
+      <input id="c">
     </div>
     <div>
       <label>Option D</label>
-      <input id="d" placeholder="Option D">
+      <input id="d">
     </div>
   </div>
 
@@ -132,42 +129,52 @@
 </div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
+const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
 
-function addQuestion() {
-  const status = document.getElementById("status");
+/* IMAGE PREVIEW */
+imageUrl.addEventListener("input",()=>{
+  const url=imageUrl.value.trim();
+  preview.innerHTML = url
+    ? `<img src="${url}" onerror="this.style.display='none'">`
+    : "";
+});
 
-  if (!examId.value || !question.value || !a.value || !b.value || !c.value || !d.value || !correct.value) {
-    status.innerHTML = "⚠ Please fill all fields";
-    status.className = "status error";
+function addQuestion(){
+  const status=document.getElementById("status");
+
+  if(!examId.value||!question.value||!a.value||!b.value||!c.value||!d.value||!correct.value){
+    status.textContent="⚠ Please fill all required fields";
+    status.className="status error";
     return;
   }
 
-  const data = {
-    type: "ADD_QUESTION",
-    examId: examId.value,
-    qid: "Q_" + Date.now(),
-    question: question.value,
-    a: a.value,
-    b: b.value,
-    c: c.value,
-    d: d.value,
-    correct: correct.value
+  const data={
+    type:"ADD_QUESTION",
+    examId:examId.value,
+    qid:"Q_"+Date.now(),
+    question:question.value,
+    image:imageUrl.value || "",   // ✅ IMAGE FIELD
+    a:a.value,
+    b:b.value,
+    c:c.value,
+    d:d.value,
+    correct:correct.value
   };
 
-  fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify(data)
+  fetch(API_URL,{
+    method:"POST",
+    body:JSON.stringify(data)
   })
-  .then(() => {
-    status.innerHTML = "✅ Question added successfully";
-    status.className = "status success";
-    question.value = a.value = b.value = c.value = d.value = "";
-    correct.value = "";
+  .then(()=>{
+    status.textContent="✅ Question added successfully";
+    status.className="status success";
+    question.value=a.value=b.value=c.value=d.value=imageUrl.value="";
+    correct.value="";
+    preview.innerHTML="";
   })
-  .catch(() => {
-    status.innerHTML = "❌ Error adding question";
-    status.className = "status error";
+  .catch(()=>{
+    status.textContent="❌ Error adding question";
+    status.className="status error";
   });
 }
 </script>
