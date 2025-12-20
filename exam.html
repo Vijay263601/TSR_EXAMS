@@ -27,7 +27,6 @@ body{
   border:1px solid #ccc;
   padding:10px;
   margin:8px 0;
-  cursor:pointer;
 }
 .option.selected{
   background:#2563eb;
@@ -57,8 +56,8 @@ input,button{
 
 <div class="container hidden" id="examPage">
 <div>
-  Exam: <span id="examIdText"></span>
-  <span class="timer" id="timer"></span>
+ Exam: <span id="examIdText"></span>
+ <span class="timer" id="timer"></span>
 </div>
 
 <h3 id="questionText"></h3>
@@ -72,14 +71,14 @@ input,button{
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
 const examId=new URLSearchParams(location.search).get("examId");
-examIdText.textContent=examId;
+document.getElementById("examIdText").textContent=examId;
 
 let questions=[],answers={},current=0;
 let cheated=false,cheatReason="",examFinished=false;
 let duration=0,MAX_TAB_SWITCH=2,tabSwitch=0;
 let startTime,interval;
-let w0=0,h0=0;
 let securityActive=false;
+let w0=0,h0=0;
 
 /* ================= START EXAM ================= */
 async function startExam(){
@@ -87,23 +86,44 @@ async function startExam(){
   alert("Fill all details");return;
  }
 
- /* Try fullscreen (desktop + some mobile browsers) */
- try{ await document.documentElement.requestFullscreen(); }catch{}
-
  document.body.classList.add("locked");
  studentForm.classList.add("hidden");
  examPage.classList.remove("hidden");
 
  w0=innerWidth; h0=innerHeight;
 
- const [cfg,qs]=await Promise.all([
-  fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})}).then(r=>r.json()),
-  fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})}).then(r=>r.json())
- ]);
+ try{
+  const cfgRes = await fetch(API_URL,{
+   method:"POST",
+   headers:{ "Content-Type":"application/json" },
+   body:JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
+  });
+  const cfg = await cfgRes.json();
 
- duration=cfg.duration;
- MAX_TAB_SWITCH=cfg.maxTabSwitch;
- questions=qs;
+  const qRes = await fetch(API_URL,{
+   method:"POST",
+   headers:{ "Content-Type":"application/json" },
+   body:JSON.stringify({ type:"GET_QUESTIONS", examId })
+  });
+  questions = await qRes.json();
+
+  duration = Number(cfg.duration);
+  MAX_TAB_SWITCH = Number(cfg.maxTabSwitch);
+
+  if(!questions.length || !duration){
+   alert("Exam data error. Contact admin.");
+   location.reload();
+   return;
+  }
+
+ }catch(e){
+  alert("Network error. Use Chrome & stable internet.");
+  location.reload();
+  return;
+ }
+
+ /* Fullscreen AFTER data load (Android fix) */
+ try{ await document.documentElement.requestFullscreen(); }catch{}
 
  startTime=Date.now();
  securityActive=true;
@@ -127,6 +147,7 @@ function render(){
   options.appendChild(d);
  });
 }
+
 function next(){ if(current<questions.length-1){current++;render()} }
 function prev(){ if(current>0){current--;render()} }
 
@@ -143,17 +164,7 @@ function startTimer(){
  },1000);
 }
 
-/* ================= SECURITY (AFTER START) ================= */
-
-document.addEventListener("fullscreenchange",()=>{
- if(!securityActive||examFinished)return;
- if(!document.fullscreenElement){
-  cheated=true;
-  cheatReason="Exited fullscreen";
-  submitExam();
- }
-});
-
+/* ================= SECURITY ================= */
 document.addEventListener("visibilitychange",()=>{
  if(!securityActive||examFinished||!document.hidden)return;
  if(++tabSwitch>MAX_TAB_SWITCH){
@@ -166,28 +177,17 @@ document.addEventListener("visibilitychange",()=>{
 window.addEventListener("blur",()=>{
  if(!securityActive||examFinished)return;
  cheated=true;
- cheatReason="Window focus lost";
+ cheatReason="Focus lost";
  submitExam();
 });
 
-addEventListener("resize",()=>{
- if(!securityActive||examFinished)return;
- if(Math.abs(innerWidth-w0)>120||Math.abs(innerHeight-h0)>120){
-  cheated=true;
-  cheatReason="Split screen / resize";
-  submitExam();
- }
-});
-
-/* Block back gesture */
 window.onpopstate=()=>{
  if(!securityActive)return;
  cheated=true;
- cheatReason="Back navigation";
+ cheatReason="Back pressed";
  submitExam();
 };
 
-/* Prevent refresh */
 window.addEventListener("beforeunload",e=>{
  if(!securityActive)return;
  e.preventDefault();
@@ -198,11 +198,11 @@ window.addEventListener("beforeunload",e=>{
 function submitExam(){
  if(examFinished)return;
  examFinished=true;
- securityActive=false;
  clearInterval(interval);
 
  fetch(API_URL,{
   method:"POST",
+  headers:{ "Content-Type":"application/json" },
   body:JSON.stringify({
    type:"SUBMIT_RESPONSE",
    examId,
