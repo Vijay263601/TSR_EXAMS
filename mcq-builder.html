@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,11 +51,13 @@ button{
 }
 .success{ color:green }
 .error{ color:red }
+
 .preview img{
   max-width:100%;
   max-height:200px;
   margin-top:10px;
   border-radius:8px;
+  border:1px solid #e5e7eb;
 }
 </style>
 </head>
@@ -65,13 +68,13 @@ button{
 <h2>MCQ Builder</h2>
 
 <label>Exam ID</label>
-<input id="examId">
+<input id="examId" placeholder="EXAM_123">
 
 <label>Question</label>
 <textarea id="question" rows="3"></textarea>
 
-<label>Question Image (optional)</label>
-<input type="file" id="imageFile" accept="image/*">
+<label>Question Image URL (optional)</label>
+<input id="imageURL" placeholder="https://example.com/image.jpg">
 <div class="preview" id="preview"></div>
 
 <div class="options">
@@ -97,19 +100,12 @@ button{
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
 
-let imageBase64="";
-
-/* IMAGE → BASE64 */
-imageFile.addEventListener("change",()=>{
-  const file=imageFile.files[0];
-  if(!file){ imageBase64=""; preview.innerHTML=""; return; }
-
-  const reader=new FileReader();
-  reader.onload=()=>{
-    imageBase64=reader.result;
-    preview.innerHTML=`<img src="${imageBase64}">`;
-  };
-  reader.readAsDataURL(file);
+/* IMAGE PREVIEW */
+imageURL.addEventListener("input",()=>{
+  const url=imageURL.value.trim();
+  preview.innerHTML = url
+    ? `<img src="${url}" onerror="this.style.display='none'">`
+    : "";
 });
 
 function addQuestion(){
@@ -126,7 +122,7 @@ function addQuestion(){
     examId:examId.value,
     qid:"Q_"+Date.now(),
     question:question.value,
-    imageBase64:imageBase64,
+    imageURL:imageURL.value.trim(), // ✅ URL ONLY
     a:a.value,b:b.value,c:c.value,d:d.value,
     correct:correct.value
   };
@@ -140,19 +136,15 @@ function addQuestion(){
     const res=JSON.parse(t);
     if(res.status!=="QUESTION_ADDED") throw "Failed";
 
-    if(imageBase64 && !res.imageURL) throw "Image not saved";
-
     status.textContent="Question added successfully";
     status.className="status success";
 
-    question.value=a.value=b.value=c.value=d.value="";
+    question.value=a.value=b.value=c.value=d.value=imageURL.value="";
     correct.value="";
-    imageFile.value="";
-    imageBase64="";
     preview.innerHTML="";
   })
   .catch(()=>{
-    status.textContent="Error saving question or image";
+    status.textContent="Error saving question";
     status.className="status error";
   });
 }
