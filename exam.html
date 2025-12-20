@@ -1,224 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Online Exam</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{
-  font-family: Arial, sans-serif;
-  background:#f1f5f9;
-  padding:16px;
-}
-.container{
-  max-width:800px;
-  margin:auto;
-  background:#fff;
-  padding:20px;
-  border-radius:12px;
-}
-.hidden{display:none}
-.option{
-  border:1px solid #ccc;
-  padding:12px;
-  margin:10px 0;
-  border-radius:8px;
-  cursor:pointer;
-}
-.option.selected{
-  background:#2563eb;
-  color:#fff;
-}
-.timer{
-  color:red;
-  font-weight:bold;
-}
-input,button{
-  width:100%;
-  padding:10px;
-  margin-top:10px;
-}
+body { font-family: Arial, sans-serif; background:#f1f5f9; padding:20px; }
+.container { max-width:800px; margin:auto; background:#fff; padding:25px; border-radius:12px; }
+.hidden { display:none; }
+input { width:100%; padding:12px; margin:8px 0; }
+.option { padding:12px; border:1px solid #cbd5f5; margin-bottom:10px; cursor:pointer; border-radius:8px; }
+.option.selected { background:#2563eb; color:#fff; }
+.timer { color:#dc2626; font-weight:bold; }
+button { padding:10px 16px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+button.secondary { background:#64748b; margin-right:8px; }
 </style>
 </head>
 
 <body>
 
+<!-- STUDENT FORM -->
 <div class="container" id="studentForm">
   <h2>Student Details</h2>
-  <input id="nameInput" placeholder="Name">
+  <p><b>Fullscreen is mandatory.</b></p>
+  <input id="nameInput" placeholder="Full Name">
   <input id="emailInput" placeholder="Email">
   <input id="rollInput" placeholder="Roll No">
   <button onclick="startExam()">Start Exam</button>
 </div>
 
+<!-- EXAM -->
 <div class="container hidden" id="examPage">
-  <div>
-    Exam: <span id="examIdText"></span>
-    <span class="timer" id="timer"></span>
-  </div>
-
+  <div>Exam ID: <span id="examIdText"></span> <span class="timer" id="timer"></span></div>
   <h3 id="questionText"></h3>
   <div id="options"></div>
-
-  <button onclick="prev()">Prev</button>
+  <button class="secondary" onclick="prev()">Previous</button>
   <button onclick="next()">Next</button>
   <button onclick="submitExam()">Submit</button>
 </div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
+/* CONFIG */
+const API_URL = "https://script.google.com/macros/s/AKfycbzlHgoe1943X0O0ZUNj4RNF-lNlO2HBP_5s-32sTjDRudaOujV8KkrIsmC5yw3u/exec";
 const examId = new URLSearchParams(location.search).get("examId");
-document.getElementById("examIdText").innerText = examId;
+examIdText.textContent = examId;
 
-const IS_ANDROID = /Android/i.test(navigator.userAgent);
-
-let questions = [];
-let answers = {};
-let current = 0;
-let duration = 0;
-let timerInterval;
-let startTime;
-let examStarted = false;
+/* STATE */
+let questions = [], answers = {}, current = 0;
+let cheated = false, cheatReason = "";
 let examFinished = false;
+let duration = 0, MAX_TAB_SWITCH = 2;
+let timerInterval, startTime;
+let fullscreenActive = false;
 
-/* ================= START EXAM ================= */
+/* FULLSCREEN */
+function enterFullscreen(){
+  const el = document.documentElement;
+  return el.requestFullscreen?.() || el.webkitRequestFullscreen?.();
+}
+function isFullscreen(){
+  return document.fullscreenElement || document.webkitFullscreenElement;
+}
+
+/* START EXAM */
 async function startExam(){
   if(!nameInput.value || !emailInput.value || !rollInput.value){
-    alert("Fill all details");
-    return;
+    alert("Fill all details"); return;
   }
 
-  /* 🔒 FULLSCREEN MUST BE FIRST (USER GESTURE) */
-  try{
-    await document.documentElement.requestFullscreen();
-  }catch{
-    alert("Fullscreen required to start exam");
-    return;
+  try {
+    await enterFullscreen();
+    fullscreenActive = true;
+  } catch {
+    alert("Fullscreen required"); return;
   }
 
   studentForm.classList.add("hidden");
   examPage.classList.remove("hidden");
 
-  /* LOAD EXAM DATA (ANDROID SAFE) */
-  try{
-    const cfgRes = await fetch(API_URL,{
-      method:"POST",
-      body: JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
-    });
-    const cfg = JSON.parse(await cfgRes.text());
+  // ⚡ FAST: parallel fetch
+  const [cfg, qs] = await Promise.all([
+    fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})}).then(r=>r.json()),
+    fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})}).then(r=>r.json())
+  ]);
 
-    const qRes = await fetch(API_URL,{
-      method:"POST",
-      body: JSON.stringify({ type:"GET_QUESTIONS", examId })
-    });
-    questions = JSON.parse(await qRes.text());
+  duration = cfg.duration;
+  MAX_TAB_SWITCH = cfg.maxTabSwitch;
+  questions = qs;
 
-    duration = Number(cfg.duration);
-
-    if(!questions.length || !duration){
-      alert("Exam data error");
-      submitExam();
-      return;
-    }
-
-  }catch(e){
-    console.error(e);
-    alert("Server error. Try again.");
-    submitExam();
-    return;
-  }
-
-  examStarted = true;
   startTime = Date.now();
-  render();
+  renderQuestion();
   startTimer();
 }
 
-/* ================= RENDER ================= */
-function render(){
+/* RENDER */
+function renderQuestion(){
   const q = questions[current];
   if(!q) return;
-
-  questionText.innerText = `Q${current+1}. ${q.question}`;
+  questionText.textContent = `Q${current+1}. ${q.question}`;
   options.innerHTML = "";
 
   ["A","B","C","D"].forEach(o=>{
-    const div = document.createElement("div");
-    div.className = "option" + (answers[q.qid]===o ? " selected":"");
-    div.innerText = q[o];
-    div.onclick = ()=>{
-      answers[q.qid] = o;
-      render();
-    };
-    options.appendChild(div);
+    const d=document.createElement("div");
+    d.className="option"+(answers[q.qid]===o?" selected":"");
+    d.textContent=q[o];
+    d.onclick=()=>{ answers[q.qid]=o; renderQuestion(); };
+    options.appendChild(d);
   });
 }
+function next(){ if(current<questions.length-1){ current++; renderQuestion(); } }
+function prev(){ if(current>0){ current--; renderQuestion(); } }
 
-function next(){
-  if(current < questions.length-1){
-    current++;
-    render();
-  }
-}
-function prev(){
-  if(current > 0){
-    current--;
-    render();
-  }
-}
-
-/* ================= TIMER ================= */
+/* TIMER */
 function startTimer(){
-  let t = duration * 60;
-  timerInterval = setInterval(()=>{
-    timer.innerText =
-      ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-    if(--t < 0){
-      submitExam();
-    }
+  let t=duration*60;
+  timerInterval=setInterval(()=>{
+    timer.textContent=` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+    if(--t<0){ cheatReason="Time up"; submitExam(); }
   },1000);
 }
 
-/* ================= SECURITY ================= */
-
-/* TAB / APP SWITCH */
-document.addEventListener("visibilitychange",()=>{
-  if(!examStarted || examFinished) return;
-  if(document.hidden){
-    submitExam();
-  }
-});
-
-/* FULLSCREEN EXIT — DESKTOP ONLY */
+/* 🔒 ANTI-CHEAT (IGNORES AFTER FINISH) */
 document.addEventListener("fullscreenchange",()=>{
-  if(IS_ANDROID) return;
-  if(!examStarted || examFinished) return;
-  if(!document.fullscreenElement){
-    submitExam();
+  if(examFinished || !fullscreenActive) return;
+  if(!isFullscreen()){
+    cheated=true; cheatReason="Exited fullscreen"; submitExam();
   }
 });
+document.addEventListener("visibilitychange",()=>{
+  if(examFinished || document.hidden===false) return;
+  cheated=true; cheatReason="Tab/app switch"; submitExam();
+});
 
-/* ================= SUBMIT ================= */
+/* SUBMIT */
 function submitExam(){
   if(examFinished) return;
   examFinished = true;
+
   clearInterval(timerInterval);
 
-  fetch(API_URL,{
-    method:"POST",
-    body: JSON.stringify({
-      type:"SUBMIT_RESPONSE",
-      examId,
-      studentName:nameInput.value,
-      roll:rollInput.value,
-      email:emailInput.value,
-      timeTaken:Math.floor((Date.now()-startTime)/1000),
-      answers:Object.keys(answers).map(qid=>({ qid, answer:answers[qid] }))
-    })
-  }).finally(()=>{
-    document.body.innerHTML = "<h2>Exam Submitted</h2>";
-    if(document.fullscreenElement) document.exitFullscreen();
+  const payload = {
+    type:"SUBMIT_RESPONSE",
+    examId,
+    studentName:nameInput.value,
+    roll:rollInput.value,
+    email:emailInput.value,
+    cheated,
+    cheatReason,
+    timeTaken:Math.floor((Date.now()-startTime)/1000),
+    answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
+  };
+
+  fetch(API_URL,{method:"POST",body:JSON.stringify(payload)})
+  .then(()=>{
+    document.body.innerHTML="<h2 style='text-align:center'>Exam submitted successfully</h2>";
+    document.exitFullscreen?.();
   });
 }
 </script>
