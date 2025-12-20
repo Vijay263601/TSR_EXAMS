@@ -87,10 +87,7 @@ button.secondary{
   </div>
 
   <h3 id="questionText"></h3>
-
-  <!-- IMAGE -->
   <img id="questionImage" class="question-image hidden">
-
   <div id="options"></div>
 
   <button class="secondary" onclick="prev()">Previous</button>
@@ -101,7 +98,7 @@ button.secondary{
 <script>
 /* ================= CONFIG ================= */
 const API_URL = "https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
-const examId = new URLSearchParams(location.search).get("examId");
+const examId = new URLSearchParams(location.search).get("examId") || "";
 document.getElementById("examIdText").textContent = examId;
 
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
@@ -121,7 +118,9 @@ let cheatReason = "";
 /* ================= FULLSCREEN HELPERS ================= */
 function enterFullscreen(){
   const el = document.documentElement;
-  return el.requestFullscreen?.() || el.webkitRequestFullscreen?.();
+  try{
+    el.requestFullscreen?.() || el.webkitRequestFullscreen?.();
+  }catch(e){}
 }
 function isFullscreen(){
   return document.fullscreenElement || document.webkitFullscreenElement;
@@ -134,26 +133,19 @@ async function startExam(){
     return;
   }
 
-  /* FULLSCREEN MUST BE TRIGGERED BY CLICK */
-  try{
-    await enterFullscreen();
-  }catch{
-    alert("Fullscreen is required to start the exam");
-    return;
-  }
+  // 🔑 DO NOT BLOCK ON FULLSCREEN
+  enterFullscreen();
 
   studentForm.classList.add("hidden");
   examPage.classList.remove("hidden");
 
   try{
-    /* GET CONFIG (ANDROID SAFE) */
     const cfgRes = await fetch(API_URL,{
       method:"POST",
       body: JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
     });
     const cfg = JSON.parse(await cfgRes.text());
 
-    /* GET QUESTIONS (ANDROID SAFE) */
     const qRes = await fetch(API_URL,{
       method:"POST",
       body: JSON.stringify({ type:"GET_QUESTIONS", examId })
@@ -188,9 +180,102 @@ function renderQuestion(){
 
   questionText.textContent = `Q${current+1}. ${q.question}`;
 
-  /* IMAGE SUPPORT */
   const img = document.getElementById("questionImage");
   if(q.imageURL){
     img.src = q.imageURL;
     img.classList.remove("hidden");
   }else{
+    img.classList.add("hidden");
+  }
+
+  options.innerHTML = "";
+  ["A","B","C","D"].forEach(o=>{
+    const d = document.createElement("div");
+    d.className = "option" + (answers[q.qid]===o ? " selected" : "");
+    d.textContent = q[o];
+    d.onclick = ()=>{
+      answers[q.qid] = o;
+      renderQuestion();
+    };
+    options.appendChild(d);
+  });
+}
+
+function next(){
+  if(current < questions.length-1){
+    current++;
+    renderQuestion();
+  }
+}
+function prev(){
+  if(current > 0){
+    current--;
+    renderQuestion();
+  }
+}
+
+/* ================= TIMER ================= */
+function startTimer(){
+  let t = duration * 60;
+  timerInterval = setInterval(()=>{
+    timer.textContent =
+      ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+    if(--t < 0){
+      cheatReason = "Time up";
+      submitExam();
+    }
+  },1000);
+}
+
+/* ================= ANTI-CHEAT ================= */
+document.addEventListener("visibilitychange",()=>{
+  if(!examStarted || examFinished) return;
+  if(document.hidden){
+    cheated = true;
+    cheatReason = "Tab / App switch";
+    submitExam();
+  }
+});
+
+document.addEventListener("fullscreenchange",()=>{
+  if(IS_ANDROID) return;
+  if(!examStarted || examFinished) return;
+  if(!isFullscreen()){
+    cheated = true;
+    cheatReason = "Exited fullscreen";
+    submitExam();
+  }
+});
+
+/* ================= SUBMIT ================= */
+function submitExam(){
+  if(examFinished) return;
+  examFinished = true;
+  clearInterval(timerInterval);
+
+  fetch(API_URL,{
+    method:"POST",
+    body: JSON.stringify({
+      type:"SUBMIT_RESPONSE",
+      examId,
+      studentName: nameInput.value,
+      roll: rollInput.value,
+      email: emailInput.value,
+      cheated,
+      cheatReason,
+      timeTaken: Math.floor((Date.now()-startTime)/1000),
+      answers: Object.keys(answers).map(qid=>({
+        qid,
+        answer: answers[qid]
+      }))
+    })
+  }).finally(()=>{
+    document.body.innerHTML =
+      "<h2 style='text-align:center'>Exam submitted successfully</h2>";
+    document.exitFullscreen?.();
+  });
+}
+</script>
+
+</body>
+</html>
