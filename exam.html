@@ -40,28 +40,45 @@ examIdText.textContent=examId;
 let questions=[],answers={},current=0;
 let cheated=false,cheatReason="",examFinished=false;
 let duration=0,MAX_TAB_SWITCH=2,tabSwitch=0;
-let startTime,interval,fullscreen=true;
+let startTime,interval;
 let w0=0,h0=0;
+let securityActive=false;
+
+/* ✅ ANDROID FIX */
+let examStartAt=0;
+const SECURITY_DELAY=3000; // 3 sec grace
 
 async function startExam(){
- if(!nameInput.value||!emailInput.value||!rollInput.value)return alert("Fill all");
- try{await document.documentElement.requestFullscreen()}catch{return alert("Fullscreen required")}
+ if(!nameInput.value||!emailInput.value||!rollInput.value)
+  return alert("Fill all");
+
+ try{ await document.documentElement.requestFullscreen(); }catch{}
+
  studentForm.classList.add("hidden");
  examPage.classList.remove("hidden");
 
- w0=innerWidth;h0=innerHeight;
+ w0=innerWidth; h0=innerHeight;
 
  const [cfg,qs]=await Promise.all([
   fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})}).then(r=>r.json()),
   fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})}).then(r=>r.json())
  ]);
 
- duration=cfg.duration;MAX_TAB_SWITCH=cfg.maxTabSwitch;questions=qs;
- startTime=Date.now();render();startTimer();
+ duration=cfg.duration;
+ MAX_TAB_SWITCH=cfg.maxTabSwitch;
+ questions=qs;
+
+ startTime=Date.now();
+ examStartAt=Date.now();     // ✅ mark exam start
+ securityActive=true;
+
+ render();
+ startTimer();
 }
 
 function render(){
- const q=questions[current];if(!q)return;
+ const q=questions[current];
+ if(!q)return;
  questionText.textContent=`Q${current+1}. ${q.question}`;
  options.innerHTML="";
  ["A","B","C","D"].forEach(o=>{
@@ -83,35 +100,56 @@ function startTimer(){
  },1000);
 }
 
+/* ================= SECURITY ================= */
+
+function ignoreInitialEvents(){
+ return Date.now()-examStartAt < SECURITY_DELAY;
+}
+
 document.addEventListener("fullscreenchange",()=>{
- if(examFinished)return;
- if(!document.fullscreenElement){cheated=true;cheatReason="Exited fullscreen";submitExam()}
+ if(!securityActive||examFinished||ignoreInitialEvents())return;
+ if(!document.fullscreenElement){
+  cheated=true;cheatReason="Exited fullscreen";submitExam();
+ }
 });
+
 document.addEventListener("visibilitychange",()=>{
- if(examFinished||!document.hidden)return;
- if(++tabSwitch>MAX_TAB_SWITCH){cheated=true;cheatReason="Tab switch";submitExam()}
+ if(!securityActive||examFinished||ignoreInitialEvents()||!document.hidden)return;
+ if(++tabSwitch>MAX_TAB_SWITCH){
+  cheated=true;cheatReason="Tab switch";submitExam();
+ }
 });
+
 addEventListener("resize",()=>{
- if(examFinished)return;
+ if(!securityActive||examFinished||ignoreInitialEvents())return;
  if(Math.abs(innerWidth-w0)>100||Math.abs(innerHeight-h0)>100){
-  cheated=true;cheatReason="Split screen detected";submitExam();
+  cheated=true;cheatReason="Split screen";submitExam();
  }
 });
 
 function submitExam(){
  if(examFinished)return;
- examFinished=true;clearInterval(interval);
- fetch(API_URL,{method:"POST",body:JSON.stringify({
-  type:"SUBMIT_RESPONSE",
-  examId,
-  studentName:nameInput.value,
-  roll:rollInput.value,
-  email:emailInput.value,
-  cheated,cheatReason,
-  timeTaken:Math.floor((Date.now()-startTime)/1000),
-  answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
- })}).then(()=>{document.body.innerHTML="<h2>Exam Submitted</h2>";document.exitFullscreen()});
+ examFinished=true;
+ securityActive=false;
+ clearInterval(interval);
+
+ fetch(API_URL,{
+  method:"POST",
+  body:JSON.stringify({
+   type:"SUBMIT_RESPONSE",
+   examId,
+   studentName:nameInput.value,
+   roll:rollInput.value,
+   email:emailInput.value,
+   cheated,cheatReason,
+   timeTaken:Math.floor((Date.now()-startTime)/1000),
+   answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
+  })
+ }).then(()=>{
+  document.body.innerHTML="<h2>Exam Submitted</h2>";
+  if(document.fullscreenElement) document.exitFullscreen();
+ });
 }
 </script>
 </body>
-</html> 
+</html>
