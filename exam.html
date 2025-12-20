@@ -90,27 +90,48 @@ let examStarted=false,examFinished=false;
 /* ================= START EXAM ================= */
 async function startExam(){
   if(!nameInput.value||!emailInput.value||!rollInput.value){
-    alert("Fill all details"); return;
+    alert("Fill all details");
+    return;
+  }
+
+  /* 🔒 FORCE FULLSCREEN */
+  try{
+    await document.documentElement.requestFullscreen();
+  }catch{
+    alert("Fullscreen is required to start the exam");
+    return; // ❌ do not start exam
+  }
+
+  /* If fullscreen STILL not active (Android edge case) */
+  if(!document.fullscreenElement && !IS_ANDROID){
+    alert("Fullscreen is required to start the exam");
+    document.exitFullscreen?.();
+    return;
   }
 
   studentForm.classList.add("hidden");
   examPage.classList.remove("hidden");
 
   try{
-    const cfgRes=await fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})});
+    const cfgRes=await fetch(API_URL,{
+      method:"POST",
+      body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})
+    });
     const cfg=JSON.parse(await cfgRes.text());
 
-    const qRes=await fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})});
+    const qRes=await fetch(API_URL,{
+      method:"POST",
+      body:JSON.stringify({type:"GET_QUESTIONS",examId})
+    });
     questions=JSON.parse(await qRes.text());
 
     duration=Number(cfg.duration);
     if(!questions.length||!duration) throw "Invalid exam";
   }catch{
-    alert("Exam load error"); return;
+    alert("Exam load error");
+    document.exitFullscreen?.();
+    return;
   }
-
-  /* Fullscreen (desktop strict, android best-effort) */
-  try{ await document.documentElement.requestFullscreen(); }catch{}
 
   examStarted=true;
   startTime=Date.now();
@@ -120,7 +141,9 @@ async function startExam(){
 
 /* ================= RENDER ================= */
 function render(){
-  const q=questions[current]; if(!q)return;
+  const q=questions[current];
+  if(!q) return;
+
   questionText.innerText=`Q${current+1}. ${q.question}`;
   options.innerHTML="";
   ["A","B","C","D"].forEach(o=>{
@@ -132,8 +155,8 @@ function render(){
   });
 }
 
-function next(){if(current<questions.length-1){current++;render()}}
-function prev(){if(current>0){current--;render()}}
+function next(){ if(current<questions.length-1){current++;render()} }
+function prev(){ if(current>0){current--;render()} }
 
 /* ================= TIMER ================= */
 function startTimer(){
@@ -154,7 +177,7 @@ document.addEventListener("visibilitychange",()=>{
 
 /* FULLSCREEN EXIT — DESKTOP ONLY */
 document.addEventListener("fullscreenchange",()=>{
-  if(IS_ANDROID) return; // ❗ ignore android false events
+  if(IS_ANDROID) return; // ignore android false triggers
   if(!examStarted||examFinished)return;
   if(!document.fullscreenElement) submitExam();
 });
