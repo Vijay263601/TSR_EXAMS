@@ -3,21 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <title>Online Exam</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-/* ===== BASIC UI ===== */
 body{
   font-family: Arial, sans-serif;
   background:#f1f5f9;
   padding:16px;
-
-  /* Mobile safety */
-  -webkit-user-select:none;
-  user-select:none;
-  -webkit-touch-callout:none;
-  overscroll-behavior:none;
-  touch-action:manipulation;
 }
 
 .container{
@@ -35,6 +27,7 @@ body{
   padding:12px;
   margin:10px 0;
   border-radius:8px;
+  cursor:pointer;
 }
 
 .option.selected{
@@ -95,6 +88,8 @@ let current = 0;
 let duration = 0;
 let timerInterval;
 let startTime;
+
+let examStarted = false;
 let examFinished = false;
 
 /* ================= START EXAM ================= */
@@ -108,14 +103,12 @@ async function startExam(){
   examPage.classList.remove("hidden");
 
   try{
-    /* ---- LOAD CONFIG ---- */
     const cfgRes = await fetch(API_URL,{
       method:"POST",
       body: JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
     });
     const cfg = JSON.parse(await cfgRes.text());
 
-    /* ---- LOAD QUESTIONS ---- */
     const qRes = await fetch(API_URL,{
       method:"POST",
       body: JSON.stringify({ type:"GET_QUESTIONS", examId })
@@ -126,21 +119,26 @@ async function startExam(){
 
     if(!questions.length || !duration){
       alert("Exam data error");
-      location.reload();
       return;
     }
-
   }catch(err){
     console.error(err);
-    alert("Server not responding. Try again.");
+    alert("Server error. Try again.");
+    return;
+  }
+
+  /* Fullscreen REQUIRED */
+  try{
+    await document.documentElement.requestFullscreen();
+  }catch{
+    alert("Fullscreen required");
     location.reload();
     return;
   }
 
-  /* Fullscreen AFTER data loads (Android safe) */
-  try{ document.documentElement.requestFullscreen(); }catch{}
-
+  examStarted = true;
   startTime = Date.now();
+
   render();
   startTimer();
 }
@@ -183,20 +181,30 @@ function prev(){
 function startTimer(){
   let t = duration * 60;
   timerInterval = setInterval(()=>{
-    timer.innerText = ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+    timer.innerText =
+      ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
     if(--t < 0){
       submitExam();
     }
   },1000);
 }
 
-/* ================= BLOCK BACK / REFRESH ================= */
-history.pushState(null,null,location.href);
-window.onpopstate = () => history.pushState(null,null,location.href);
+/* ================= SECURITY (ONLY 2) ================= */
 
-window.addEventListener("beforeunload", e=>{
-  e.preventDefault();
-  e.returnValue = "";
+/* Fullscreen exit */
+document.addEventListener("fullscreenchange",()=>{
+  if(!examStarted || examFinished) return;
+  if(!document.fullscreenElement){
+    submitExam();
+  }
+});
+
+/* Tab / App switch */
+document.addEventListener("visibilitychange",()=>{
+  if(!examStarted || examFinished) return;
+  if(document.hidden){
+    submitExam();
+  }
 });
 
 /* ================= SUBMIT ================= */
