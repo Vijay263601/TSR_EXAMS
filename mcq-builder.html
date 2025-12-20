@@ -7,9 +7,8 @@
 
 <style>
 body{
-  font-family: Inter, Arial, sans-serif;
+  font-family: Arial, sans-serif;
   background:#f1f5f9;
-  margin:0;
   padding:20px;
 }
 .container{
@@ -18,63 +17,44 @@ body{
   background:#fff;
   padding:25px;
   border-radius:12px;
-  box-shadow:0 10px 25px rgba(0,0,0,0.08);
-}
-h2{
-  text-align:center;
-  margin-bottom:20px;
-  color:#0f172a;
 }
 label{
   font-weight:600;
-  margin-top:12px;
   display:block;
-  color:#334155;
+  margin-top:12px;
 }
 input, textarea, select{
   width:100%;
-  padding:12px;
+  padding:10px;
   margin-top:6px;
-  border-radius:8px;
-  border:1px solid #cbd5f5;
-  font-size:15px;
 }
-textarea{ resize:vertical }
 .options{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:10px;
 }
 button{
-  width:100%;
   margin-top:20px;
-  padding:14px;
+  padding:12px;
+  width:100%;
   background:#2563eb;
-  color:white;
+  color:#fff;
   border:none;
-  border-radius:10px;
-  font-size:16px;
-  font-weight:600;
+  border-radius:8px;
   cursor:pointer;
 }
-button:hover{ background:#1d4ed8 }
 .status{
+  margin-top:12px;
   text-align:center;
-  margin-top:15px;
   font-weight:600;
 }
 .success{ color:green }
 .error{ color:red }
-
-.preview{
-  margin-top:10px;
-  text-align:center;
-}
 .preview img{
   max-width:100%;
   max-height:200px;
-  border-radius:10px;
-  border:1px solid #e5e7eb;
+  margin-top:10px;
+  border-radius:8px;
 }
 </style>
 </head>
@@ -82,66 +62,52 @@ button:hover{ background:#1d4ed8 }
 <body>
 
 <div class="container">
-  <h2>MCQ Builder</h2>
+<h2>MCQ Builder</h2>
 
-  <label>Exam ID</label>
-  <input id="examId" placeholder="EXAM_123456">
+<label>Exam ID</label>
+<input id="examId">
 
-  <label>Question</label>
-  <textarea id="question" rows="3"></textarea>
+<label>Question</label>
+<textarea id="question" rows="3"></textarea>
 
-  <!-- DIRECT IMAGE UPLOAD -->
-  <label>Question Image (optional)</label>
-  <input type="file" id="imageFile" accept="image/*">
-  <div class="preview" id="preview"></div>
+<label>Question Image (optional)</label>
+<input type="file" id="imageFile" accept="image/*">
+<div class="preview" id="preview"></div>
 
-  <div class="options">
-    <div>
-      <label>Option A</label>
-      <input id="a">
-    </div>
-    <div>
-      <label>Option B</label>
-      <input id="b">
-    </div>
-    <div>
-      <label>Option C</label>
-      <input id="c">
-    </div>
-    <div>
-      <label>Option D</label>
-      <input id="d">
-    </div>
-  </div>
+<div class="options">
+  <div><label>A</label><input id="a"></div>
+  <div><label>B</label><input id="b"></div>
+  <div><label>C</label><input id="c"></div>
+  <div><label>D</label><input id="d"></div>
+</div>
 
-  <label>Correct Answer</label>
-  <select id="correct">
-    <option value="">Select correct option</option>
-    <option value="A">Option A</option>
-    <option value="B">Option B</option>
-    <option value="C">Option C</option>
-    <option value="D">Option D</option>
-  </select>
+<label>Correct Answer</label>
+<select id="correct">
+  <option value="">Select</option>
+  <option>A</option>
+  <option>B</option>
+  <option>C</option>
+  <option>D</option>
+</select>
 
-  <button onclick="addQuestion()">➕ Add Question</button>
-
-  <div id="status" class="status"></div>
+<button onclick="addQuestion()">Add Question</button>
+<div id="status" class="status"></div>
 </div>
 
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
 
-let imageBase64 = "";
+let imageBase64="";
 
-/* IMAGE PREVIEW + BASE64 */
+/* IMAGE → BASE64 */
 imageFile.addEventListener("change",()=>{
   const file=imageFile.files[0];
-  if(!file) return;
+  if(!file){ imageBase64=""; preview.innerHTML=""; return; }
 
   const reader=new FileReader();
   reader.onload=()=>{
-    imageBase64 = reader.result; // base64
-    preview.innerHTML = `<img src="${imageBase64}">`;
+    imageBase64=reader.result;
+    preview.innerHTML=`<img src="${imageBase64}">`;
   };
   reader.readAsDataURL(file);
 });
@@ -150,31 +116,35 @@ function addQuestion(){
   const status=document.getElementById("status");
 
   if(!examId.value||!question.value||!a.value||!b.value||!c.value||!d.value||!correct.value){
-    status.textContent="⚠ Please fill all required fields";
+    status.textContent="Fill all required fields";
     status.className="status error";
     return;
   }
 
-  const data={
+  const payload={
     type:"ADD_QUESTION",
     examId:examId.value,
     qid:"Q_"+Date.now(),
     question:question.value,
-    imageBase64:imageBase64, // ✅ DIRECT IMAGE DATA
-    a:a.value,
-    b:b.value,
-    c:c.value,
-    d:d.value,
+    imageBase64:imageBase64,
+    a:a.value,b:b.value,c:c.value,d:d.value,
     correct:correct.value
   };
 
   fetch(API_URL,{
     method:"POST",
-    body:JSON.stringify(data)
+    body:JSON.stringify(payload)
   })
-  .then(()=>{
-    status.textContent="✅ Question added successfully";
+  .then(r=>r.text())
+  .then(t=>{
+    const res=JSON.parse(t);
+    if(res.status!=="QUESTION_ADDED") throw "Failed";
+
+    if(imageBase64 && !res.imageURL) throw "Image not saved";
+
+    status.textContent="Question added successfully";
     status.className="status success";
+
     question.value=a.value=b.value=c.value=d.value="";
     correct.value="";
     imageFile.value="";
@@ -182,7 +152,7 @@ function addQuestion(){
     preview.innerHTML="";
   })
   .catch(()=>{
-    status.textContent="❌ Error adding question";
+    status.textContent="Error saving question or image";
     status.className="status error";
   });
 }
