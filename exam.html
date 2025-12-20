@@ -10,6 +10,8 @@ body{
   font-family:Arial;
   background:#f1f5f9;
   padding:20px;
+}
+.locked{
   overscroll-behavior:none;
   touch-action:none;
 }
@@ -35,14 +37,9 @@ body{
   color:red;
   font-weight:bold;
 }
-input{
-  display:block;
+input,button{
   width:100%;
   padding:10px;
-  margin:10px 0;
-}
-button{
-  padding:10px 15px;
   margin-top:10px;
 }
 </style>
@@ -74,7 +71,6 @@ button{
 
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
-
 const examId=new URLSearchParams(location.search).get("examId");
 examIdText.textContent=examId;
 
@@ -83,6 +79,7 @@ let cheated=false,cheatReason="",examFinished=false;
 let duration=0,MAX_TAB_SWITCH=2,tabSwitch=0;
 let startTime,interval;
 let w0=0,h0=0;
+let securityActive=false;
 
 /* ================= START EXAM ================= */
 async function startExam(){
@@ -90,13 +87,10 @@ async function startExam(){
   alert("Fill all details");return;
  }
 
- try{
-  await document.documentElement.requestFullscreen();
-  document.body.requestPointerLock();
- }catch{
-  alert("Fullscreen & Pointer Lock required");return;
- }
+ /* Try fullscreen (desktop + some mobile browsers) */
+ try{ await document.documentElement.requestFullscreen(); }catch{}
 
+ document.body.classList.add("locked");
  studentForm.classList.add("hidden");
  examPage.classList.remove("hidden");
 
@@ -112,6 +106,7 @@ async function startExam(){
  questions=qs;
 
  startTime=Date.now();
+ securityActive=true;
  render();
  startTimer();
 }
@@ -132,7 +127,6 @@ function render(){
   options.appendChild(d);
  });
 }
-
 function next(){ if(current<questions.length-1){current++;render()} }
 function prev(){ if(current>0){current--;render()} }
 
@@ -149,11 +143,10 @@ function startTimer(){
  },1000);
 }
 
-/* ================= SECURITY ================= */
+/* ================= SECURITY (AFTER START) ================= */
 
-/* Fullscreen exit */
 document.addEventListener("fullscreenchange",()=>{
- if(examFinished)return;
+ if(!securityActive||examFinished)return;
  if(!document.fullscreenElement){
   cheated=true;
   cheatReason="Exited fullscreen";
@@ -161,74 +154,42 @@ document.addEventListener("fullscreenchange",()=>{
  }
 });
 
-/* Tab switch */
 document.addEventListener("visibilitychange",()=>{
- if(examFinished||!document.hidden)return;
+ if(!securityActive||examFinished||!document.hidden)return;
  if(++tabSwitch>MAX_TAB_SWITCH){
   cheated=true;
-  cheatReason="Tab switched";
+  cheatReason="App switched";
   submitExam();
  }
 });
 
-/* Window blur (Alt+Tab / floating) */
 window.addEventListener("blur",()=>{
- if(examFinished)return;
+ if(!securityActive||examFinished)return;
  cheated=true;
  cheatReason="Window focus lost";
  submitExam();
 });
 
-/* Resize / split screen */
 addEventListener("resize",()=>{
- if(examFinished)return;
- if(Math.abs(innerWidth-w0)>100||Math.abs(innerHeight-h0)>100){
+ if(!securityActive||examFinished)return;
+ if(Math.abs(innerWidth-w0)>120||Math.abs(innerHeight-h0)>120){
   cheated=true;
-  cheatReason="Split screen detected";
+  cheatReason="Split screen / resize";
   submitExam();
  }
 });
 
-/* Block back button */
-history.pushState(null,null,location.href);
+/* Block back gesture */
 window.onpopstate=()=>{
+ if(!securityActive)return;
  cheated=true;
  cheatReason="Back navigation";
  submitExam();
 };
 
-/* Block right click */
-document.addEventListener("contextmenu",e=>e.preventDefault());
-
-/* Block keys */
-document.addEventListener("keydown",e=>{
- if(
-  e.key==="Escape"||
-  e.key==="F5"||
-  e.key==="F11"||
-  e.key==="Tab"||
-  e.altKey||
-  e.ctrlKey||
-  e.metaKey
- ){
-  e.preventDefault();
-  cheated=true;
-  cheatReason="Blocked key used";
-  submitExam();
- }
-});
-
-/* Pointer lock removal */
-document.addEventListener("pointerlockchange",()=>{
- if(!document.pointerLockElement && !examFinished){
-  cheated=true;
-  cheatReason="Pointer lock removed";
-  submitExam();
- }
-});
-
-/* Prevent reload */
+/* Prevent refresh */
 window.addEventListener("beforeunload",e=>{
+ if(!securityActive)return;
  e.preventDefault();
  e.returnValue="";
 });
@@ -237,6 +198,7 @@ window.addEventListener("beforeunload",e=>{
 function submitExam(){
  if(examFinished)return;
  examFinished=true;
+ securityActive=false;
  clearInterval(interval);
 
  fetch(API_URL,{
@@ -254,7 +216,7 @@ function submitExam(){
   })
  }).then(()=>{
   document.body.innerHTML="<h2>Exam Submitted</h2>";
-  document.exitFullscreen();
+  if(document.fullscreenElement) document.exitFullscreen();
  });
 }
 </script>
