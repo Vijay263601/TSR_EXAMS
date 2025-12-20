@@ -3,43 +3,55 @@
 <head>
 <meta charset="UTF-8">
 <title>Online Exam</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 
 <style>
+/* BASIC LOCKS */
 body{
-  font-family:Arial;
+  font-family: Arial, sans-serif;
   background:#f1f5f9;
-  padding:20px;
-}
-.locked{
+  padding:15px;
+
+  /* Disable selection & gestures */
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
   overscroll-behavior:none;
-  touch-action:none;
+  touch-action:manipulation;
 }
+
 .container{
   max-width:800px;
   margin:auto;
   background:#fff;
-  padding:25px;
+  padding:20px;
   border-radius:12px;
 }
-.hidden{display:none}
+
+.hidden{ display:none }
+
 .option{
   border:1px solid #ccc;
-  padding:10px;
-  margin:8px 0;
+  padding:12px;
+  margin:10px 0;
+  border-radius:8px;
 }
+
 .option.selected{
   background:#2563eb;
   color:#fff;
 }
+
 .timer{
   color:red;
   font-weight:bold;
 }
+
 input,button{
   width:100%;
   padding:10px;
   margin-top:10px;
+  font-size:16px;
 }
 </style>
 </head>
@@ -47,177 +59,145 @@ input,button{
 <body>
 
 <div class="container" id="studentForm">
-<h2>Student Details</h2>
-<input id="nameInput" placeholder="Name">
-<input id="emailInput" placeholder="Email">
-<input id="rollInput" placeholder="Roll No">
-<button onclick="startExam()">Start Exam</button>
+  <h2>Student Details</h2>
+  <input id="nameInput" placeholder="Name">
+  <input id="emailInput" placeholder="Email">
+  <input id="rollInput" placeholder="Roll No">
+  <button onclick="startExam()">Start Exam</button>
 </div>
 
 <div class="container hidden" id="examPage">
-<div>
- Exam: <span id="examIdText"></span>
- <span class="timer" id="timer"></span>
-</div>
+  <div>
+    Exam: <span id="examIdText"></span>
+    <span class="timer" id="timer"></span>
+  </div>
 
-<h3 id="questionText"></h3>
-<div id="options"></div>
+  <h3 id="questionText"></h3>
+  <div id="options"></div>
 
-<button onclick="prev()">Prev</button>
-<button onclick="next()">Next</button>
-<button onclick="submitExam()">Submit</button>
+  <button onclick="prev()">Prev</button>
+  <button onclick="next()">Next</button>
+  <button onclick="submitExam()">Submit</button>
 </div>
 
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
-const examId=new URLSearchParams(location.search).get("examId");
-document.getElementById("examIdText").textContent=examId;
+const examId = new URLSearchParams(location.search).get("examId");
+document.getElementById("examIdText").innerText = examId;
 
-let questions=[],answers={},current=0;
-let cheated=false,cheatReason="",examFinished=false;
-let duration=0,MAX_TAB_SWITCH=2,tabSwitch=0;
-let startTime,interval;
-let securityActive=false;
-let w0=0,h0=0;
+let questions=[], answers={}, current=0;
+let duration=0, timerInterval, startTime;
 
 /* ================= START EXAM ================= */
 async function startExam(){
- if(!nameInput.value||!emailInput.value||!rollInput.value){
-  alert("Fill all details");return;
- }
-
- document.body.classList.add("locked");
- studentForm.classList.add("hidden");
- examPage.classList.remove("hidden");
-
- w0=innerWidth; h0=innerHeight;
-
- try{
-  const cfgRes = await fetch(API_URL,{
-   method:"POST",
-   headers:{ "Content-Type":"application/json" },
-   body:JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
-  });
-  const cfg = await cfgRes.json();
-
-  const qRes = await fetch(API_URL,{
-   method:"POST",
-   headers:{ "Content-Type":"application/json" },
-   body:JSON.stringify({ type:"GET_QUESTIONS", examId })
-  });
-  questions = await qRes.json();
-
-  duration = Number(cfg.duration);
-  MAX_TAB_SWITCH = Number(cfg.maxTabSwitch);
-
-  if(!questions.length || !duration){
-   alert("Exam data error. Contact admin.");
-   location.reload();
-   return;
+  if(!nameInput.value || !emailInput.value || !rollInput.value){
+    alert("Fill all details");
+    return;
   }
 
- }catch(e){
-  alert("Network error. Use Chrome & stable internet.");
-  location.reload();
-  return;
- }
+  studentForm.classList.add("hidden");
+  examPage.classList.remove("hidden");
 
- /* Fullscreen AFTER data load (Android fix) */
- try{ await document.documentElement.requestFullscreen(); }catch{}
+  /* Load exam data (ANDROID SAFE) */
+  try{
+    const cfgRes = await fetch(API_URL,{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
+    });
+    const cfg = await cfgRes.json();
 
- startTime=Date.now();
- securityActive=true;
- render();
- startTimer();
+    const qRes = await fetch(API_URL,{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ type:"GET_QUESTIONS", examId })
+    });
+    questions = await qRes.json();
+
+    duration = Number(cfg.duration);
+
+    if(!questions.length || !duration){
+      alert("Exam data error");
+      location.reload();
+      return;
+    }
+
+  }catch{
+    alert("Internet issue. Try again.");
+    location.reload();
+    return;
+  }
+
+  /* Fullscreen AFTER load (Android fix) */
+  try{
+    document.documentElement.requestFullscreen();
+  }catch{}
+
+  startTime = Date.now();
+  render();
+  startTimer();
 }
 
 /* ================= RENDER ================= */
 function render(){
- const q=questions[current];
- if(!q)return;
+  const q = questions[current];
+  if(!q) return;
 
- questionText.textContent=`Q${current+1}. ${q.question}`;
- options.innerHTML="";
+  questionText.innerText = `Q${current+1}. ${q.question}`;
+  options.innerHTML = "";
 
- ["A","B","C","D"].forEach(o=>{
-  const d=document.createElement("div");
-  d.className="option"+(answers[q.qid]===o?" selected":"");
-  d.textContent=q[o];
-  d.onclick=()=>{answers[q.qid]=o;render()};
-  options.appendChild(d);
- });
+  ["A","B","C","D"].forEach(o=>{
+    const div = document.createElement("div");
+    div.className = "option" + (answers[q.qid]===o ? " selected" : "");
+    div.innerText = q[o];
+    div.onclick = ()=>{ answers[q.qid]=o; render(); };
+    options.appendChild(div);
+  });
 }
 
-function next(){ if(current<questions.length-1){current++;render()} }
-function prev(){ if(current>0){current--;render()} }
+function next(){ if(current < questions.length-1){ current++; render(); } }
+function prev(){ if(current > 0){ current--; render(); } }
 
 /* ================= TIMER ================= */
 function startTimer(){
- let t=duration*60;
- interval=setInterval(()=>{
-  timer.textContent=` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-  if(--t<0){
-   cheated=true;
-   cheatReason="Time up";
-   submitExam();
-  }
- },1000);
+  let t = duration * 60;
+  timerInterval = setInterval(()=>{
+    timer.innerText = ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+    if(--t < 0){
+      submitExam();
+    }
+  },1000);
 }
 
-/* ================= SECURITY ================= */
-document.addEventListener("visibilitychange",()=>{
- if(!securityActive||examFinished||!document.hidden)return;
- if(++tabSwitch>MAX_TAB_SWITCH){
-  cheated=true;
-  cheatReason="App switched";
-  submitExam();
- }
-});
+/* ================= BLOCK BACK & REFRESH ================= */
+history.pushState(null,null,location.href);
+window.onpopstate = ()=> history.pushState(null,null,location.href);
 
-window.addEventListener("blur",()=>{
- if(!securityActive||examFinished)return;
- cheated=true;
- cheatReason="Focus lost";
- submitExam();
-});
-
-window.onpopstate=()=>{
- if(!securityActive)return;
- cheated=true;
- cheatReason="Back pressed";
- submitExam();
-};
-
-window.addEventListener("beforeunload",e=>{
- if(!securityActive)return;
- e.preventDefault();
- e.returnValue="";
+window.addEventListener("beforeunload", e=>{
+  e.preventDefault();
+  e.returnValue="";
 });
 
 /* ================= SUBMIT ================= */
 function submitExam(){
- if(examFinished)return;
- examFinished=true;
- clearInterval(interval);
+  clearInterval(timerInterval);
 
- fetch(API_URL,{
-  method:"POST",
-  headers:{ "Content-Type":"application/json" },
-  body:JSON.stringify({
-   type:"SUBMIT_RESPONSE",
-   examId,
-   studentName:nameInput.value,
-   roll:rollInput.value,
-   email:emailInput.value,
-   cheated,
-   cheatReason,
-   timeTaken:Math.floor((Date.now()-startTime)/1000),
-   answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
-  })
- }).then(()=>{
-  document.body.innerHTML="<h2>Exam Submitted</h2>";
-  if(document.fullscreenElement) document.exitFullscreen();
- });
+  fetch(API_URL,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      type:"SUBMIT_RESPONSE",
+      examId,
+      studentName:nameInput.value,
+      roll:rollInput.value,
+      email:emailInput.value,
+      timeTaken:Math.floor((Date.now()-startTime)/1000),
+      answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
+    })
+  }).finally(()=>{
+    document.body.innerHTML="<h2>Exam Submitted</h2>";
+    if(document.fullscreenElement) document.exitFullscreen();
+  });
 }
 </script>
 
