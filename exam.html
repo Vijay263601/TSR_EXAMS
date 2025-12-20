@@ -3,55 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <title>Online Exam</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
-/* BASIC LOCKS */
 body{
-  font-family: Arial, sans-serif;
+  font-family:Arial;
   background:#f1f5f9;
-  padding:15px;
-
-  /* Disable selection & gestures */
-  -webkit-user-select:none;
-  user-select:none;
-  -webkit-touch-callout:none;
+  padding:20px;
   overscroll-behavior:none;
-  touch-action:manipulation;
+  touch-action:none;
 }
-
 .container{
   max-width:800px;
   margin:auto;
   background:#fff;
-  padding:20px;
+  padding:25px;
   border-radius:12px;
 }
-
-.hidden{ display:none }
-
+.hidden{display:none}
 .option{
   border:1px solid #ccc;
-  padding:12px;
-  margin:10px 0;
-  border-radius:8px;
+  padding:10px;
+  margin:8px 0;
+  cursor:pointer;
 }
-
 .option.selected{
   background:#2563eb;
   color:#fff;
 }
-
 .timer{
   color:red;
   font-weight:bold;
 }
-
-input,button{
+input{
+  display:block;
   width:100%;
   padding:10px;
+  margin:10px 0;
+}
+button{
+  padding:10px 15px;
   margin-top:10px;
-  font-size:16px;
 }
 </style>
 </head>
@@ -59,145 +51,203 @@ input,button{
 <body>
 
 <div class="container" id="studentForm">
-  <h2>Student Details</h2>
-  <input id="nameInput" placeholder="Name">
-  <input id="emailInput" placeholder="Email">
-  <input id="rollInput" placeholder="Roll No">
-  <button onclick="startExam()">Start Exam</button>
+<h2>Student Details</h2>
+<input id="nameInput" placeholder="Name">
+<input id="emailInput" placeholder="Email">
+<input id="rollInput" placeholder="Roll No">
+<button onclick="startExam()">Start Exam</button>
 </div>
 
 <div class="container hidden" id="examPage">
-  <div>
-    Exam: <span id="examIdText"></span>
-    <span class="timer" id="timer"></span>
-  </div>
+<div>
+  Exam: <span id="examIdText"></span>
+  <span class="timer" id="timer"></span>
+</div>
 
-  <h3 id="questionText"></h3>
-  <div id="options"></div>
+<h3 id="questionText"></h3>
+<div id="options"></div>
 
-  <button onclick="prev()">Prev</button>
-  <button onclick="next()">Next</button>
-  <button onclick="submitExam()">Submit</button>
+<button onclick="prev()">Prev</button>
+<button onclick="next()">Next</button>
+<button onclick="submitExam()">Submit</button>
 </div>
 
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyzARFGPJ6-nYRu-QGgwZ3dTgBCiSqpEqPvt6IGRSem1bIgD-E6aVYo4jxMz-x4H8AR/exec";
-const examId = new URLSearchParams(location.search).get("examId");
-document.getElementById("examIdText").innerText = examId;
 
-let questions=[], answers={}, current=0;
-let duration=0, timerInterval, startTime;
+const examId=new URLSearchParams(location.search).get("examId");
+examIdText.textContent=examId;
+
+let questions=[],answers={},current=0;
+let cheated=false,cheatReason="",examFinished=false;
+let duration=0,MAX_TAB_SWITCH=2,tabSwitch=0;
+let startTime,interval;
+let w0=0,h0=0;
+let securityActive=false;   // ✅ IMPORTANT FLAG
 
 /* ================= START EXAM ================= */
 async function startExam(){
-  if(!nameInput.value || !emailInput.value || !rollInput.value){
-    alert("Fill all details");
-    return;
-  }
+ if(!nameInput.value||!emailInput.value||!rollInput.value){
+  alert("Fill all details");return;
+ }
 
-  studentForm.classList.add("hidden");
-  examPage.classList.remove("hidden");
+ studentForm.classList.add("hidden");
+ examPage.classList.remove("hidden");
 
-  /* Load exam data (ANDROID SAFE) */
-  try{
-    const cfgRes = await fetch(API_URL,{
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({ type:"GET_EXAM_CONFIG", examId })
-    });
-    const cfg = await cfgRes.json();
+ w0=innerWidth; h0=innerHeight;
 
-    const qRes = await fetch(API_URL,{
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({ type:"GET_QUESTIONS", examId })
-    });
-    questions = await qRes.json();
+ const [cfg,qs]=await Promise.all([
+  fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_EXAM_CONFIG",examId})}).then(r=>r.json()),
+  fetch(API_URL,{method:"POST",body:JSON.stringify({type:"GET_QUESTIONS",examId})}).then(r=>r.json())
+ ]);
 
-    duration = Number(cfg.duration);
+ duration=Number(cfg.duration);
+ MAX_TAB_SWITCH=Number(cfg.maxTabSwitch);
+ questions=qs;
 
-    if(!questions.length || !duration){
-      alert("Exam data error");
-      location.reload();
-      return;
-    }
+ if(!questions.length || !duration){
+  alert("Exam data error");
+  location.reload();
+  return;
+ }
 
-  }catch{
-    alert("Internet issue. Try again.");
-    location.reload();
-    return;
-  }
+ try{ await document.documentElement.requestFullscreen(); }catch{}
 
-  /* Fullscreen AFTER load (Android fix) */
-  try{
-    document.documentElement.requestFullscreen();
-  }catch{}
-
-  startTime = Date.now();
-  render();
-  startTimer();
+ startTime=Date.now();
+ securityActive=true;   // ✅ SECURITY STARTS HERE
+ render();
+ startTimer();
 }
 
 /* ================= RENDER ================= */
 function render(){
-  const q = questions[current];
-  if(!q) return;
+ const q=questions[current];
+ if(!q)return;
 
-  questionText.innerText = `Q${current+1}. ${q.question}`;
-  options.innerHTML = "";
+ questionText.textContent=`Q${current+1}. ${q.question}`;
+ options.innerHTML="";
 
-  ["A","B","C","D"].forEach(o=>{
-    const div = document.createElement("div");
-    div.className = "option" + (answers[q.qid]===o ? " selected" : "");
-    div.innerText = q[o];
-    div.onclick = ()=>{ answers[q.qid]=o; render(); };
-    options.appendChild(div);
-  });
+ ["A","B","C","D"].forEach(o=>{
+  const d=document.createElement("div");
+  d.className="option"+(answers[q.qid]===o?" selected":"");
+  d.textContent=q[o];
+  d.onclick=()=>{answers[q.qid]=o;render()};
+  options.appendChild(d);
+ });
 }
 
-function next(){ if(current < questions.length-1){ current++; render(); } }
-function prev(){ if(current > 0){ current--; render(); } }
+function next(){ if(current<questions.length-1){current++;render()} }
+function prev(){ if(current>0){current--;render()} }
 
 /* ================= TIMER ================= */
 function startTimer(){
-  let t = duration * 60;
-  timerInterval = setInterval(()=>{
-    timer.innerText = ` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-    if(--t < 0){
-      submitExam();
-    }
-  },1000);
+ let t=duration*60;
+ interval=setInterval(()=>{
+  timer.textContent=` | ${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
+  if(--t<0){
+   cheated=true;
+   cheatReason="Time up";
+   submitExam();
+  }
+ },1000);
 }
 
-/* ================= BLOCK BACK & REFRESH ================= */
-history.pushState(null,null,location.href);
-window.onpopstate = ()=> history.pushState(null,null,location.href);
+/* ================= SECURITY (ONLY AFTER START) ================= */
 
-window.addEventListener("beforeunload", e=>{
+document.addEventListener("fullscreenchange",()=>{
+ if(!securityActive||examFinished)return;
+ if(!document.fullscreenElement){
+  cheated=true;
+  cheatReason="Exited fullscreen";
+  submitExam();
+ }
+});
+
+document.addEventListener("visibilitychange",()=>{
+ if(!securityActive||examFinished||!document.hidden)return;
+ if(++tabSwitch>MAX_TAB_SWITCH){
+  cheated=true;
+  cheatReason="Tab switched";
+  submitExam();
+ }
+});
+
+window.addEventListener("blur",()=>{
+ if(!securityActive||examFinished)return;
+ cheated=true;
+ cheatReason="Window focus lost";
+ submitExam();
+});
+
+addEventListener("resize",()=>{
+ if(!securityActive||examFinished)return;
+ if(Math.abs(innerWidth-w0)>100||Math.abs(innerHeight-h0)>100){
+  cheated=true;
+  cheatReason="Split screen detected";
+  submitExam();
+ }
+});
+
+history.pushState(null,null,location.href);
+window.onpopstate=()=>{
+ if(!securityActive)return;
+ cheated=true;
+ cheatReason="Back navigation";
+ submitExam();
+};
+
+document.addEventListener("contextmenu",e=>{
+ if(securityActive) e.preventDefault();
+});
+
+document.addEventListener("keydown",e=>{
+ if(!securityActive)return;
+ if(
+  e.key==="Escape"||
+  e.key==="F5"||
+  e.key==="F11"||
+  e.key==="Tab"||
+  e.altKey||
+  e.ctrlKey||
+  e.metaKey
+ ){
   e.preventDefault();
-  e.returnValue="";
+  cheated=true;
+  cheatReason="Blocked key used";
+  submitExam();
+ }
+});
+
+window.addEventListener("beforeunload",e=>{
+ if(!securityActive)return;
+ e.preventDefault();
+ e.returnValue="";
 });
 
 /* ================= SUBMIT ================= */
 function submitExam(){
-  clearInterval(timerInterval);
+ if(examFinished)return;
+ examFinished=true;
+ securityActive=false;
+ clearInterval(interval);
 
-  fetch(API_URL,{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({
-      type:"SUBMIT_RESPONSE",
-      examId,
-      studentName:nameInput.value,
-      roll:rollInput.value,
-      email:emailInput.value,
-      timeTaken:Math.floor((Date.now()-startTime)/1000),
-      answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
-    })
-  }).finally(()=>{
-    document.body.innerHTML="<h2>Exam Submitted</h2>";
-    if(document.fullscreenElement) document.exitFullscreen();
-  });
+ fetch(API_URL,{
+  method:"POST",
+  body:JSON.stringify({
+   type:"SUBMIT_RESPONSE",
+   examId,
+   studentName:nameInput.value,
+   roll:rollInput.value,
+   email:emailInput.value,
+   cheated,
+   cheatReason,
+   timeTaken:Math.floor((Date.now()-startTime)/1000),
+   answers:Object.keys(answers).map(qid=>({qid,answer:answers[qid]}))
+  })
+ }).then(()=>{
+  document.body.innerHTML="<h2>Exam Submitted</h2>";
+  if(document.fullscreenElement) document.exitFullscreen();
+ });
 }
 </script>
 
