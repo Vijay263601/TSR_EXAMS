@@ -1,19 +1,28 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Exam Login</title>
+  <meta charset="UTF-8">
+  <title>Student Login</title>
+  <link rel="stylesheet" href="login.css">
 </head>
 <body>
 
-<input id="name" placeholder="Name">
-<input id="roll" placeholder="Roll No">
-<input id="email" placeholder="Email">
-<input id="examId" placeholder="Exam ID">
+<div class="login-card">
+  <h1>Student Login</h1>
+  <p>Enter your details to start the exam</p>
 
-<button onclick="startExam()">Start Exam</button>
+  <input id="name" placeholder="Full Name">
+  <input id="roll" placeholder="Roll Number">
+  <input id="email" placeholder="Email">
+  <input id="examId" placeholder="Exam ID">
 
-<!-- SCRIPT MUST BE AT BOTTOM -->
+  <button onclick="startExam()">Start Exam</button>
+
+  <div class="login-footer">
+    Exam access is monitored
+  </div>
+</div>
+
 <script src="login.js"></script>
-
 </body>
 </html>

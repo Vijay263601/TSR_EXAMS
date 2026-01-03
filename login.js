@@ -9,16 +9,13 @@ function startExam() {
     return;
   }
 
+  // Save student info for exam page
   sessionStorage.setItem(
     "student",
-    JSON.stringify({
-      name: name,
-      roll: roll,
-      email: email
-    })
+    JSON.stringify({ name, roll, email })
   );
 
+  // Redirect to exam
   window.location.href =
-    BASE_PATH + "/exam/exam.html?examId=" +
-    encodeURIComponent(examId);
+    "../exam/exam.html?examId=" + encodeURIComponent(examId);
 }
