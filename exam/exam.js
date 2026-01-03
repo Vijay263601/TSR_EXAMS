@@ -127,9 +127,8 @@ function renderQuestions(questions) {
 
     let html = `<p><b>Q${i + 1}. ${q.question}</b></p>`;
 
-    if (q.image) {
-      html += `<img src="${q.image}" width="300"><br>`;
-    }
+    html += `<img src="${q.image}" class="question-image"><br>`;
+
 
     let options = q.options.map((opt, idx) => ({
       text: opt,
