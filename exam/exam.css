@@ -1,0 +1,135 @@
+/* ========== RESET ========== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f4f6f9;
+  color: #333;
+  line-height: 1.6;
+}
+
+/* ========== HEADER ========== */
+.exam-header {
+  position: sticky;
+  top: 0;
+  background: #1e293b;
+  color: #fff;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+
+.exam-header h2 {
+  font-size: 18px;
+}
+
+.timer-box {
+  background: #0f172a;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+/* ========== WARNING ========== */
+#warning {
+  text-align: center;
+  padding: 10px;
+  background: #fff3cd;
+  color: #92400e;
+  font-weight: bold;
+  border-bottom: 1px solid #fde68a;
+}
+
+/* ========== MAIN CONTAINER ========== */
+.container {
+  max-width: 900px;
+  margin: 20px auto;
+  background: #ffffff;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+/* ========== QUESTION ========== */
+.question {
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.question p {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.question img {
+  display: block;
+  margin: 10px 0;
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+/* ========== OPTIONS ========== */
+.question label {
+  display: block;
+  padding: 10px 12px;
+  margin: 6px 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.question label:hover {
+  background: #f1f5f9;
+}
+
+.question input[type="radio"] {
+  margin-right: 10px;
+}
+
+/* ========== SUBMIT BUTTON ========== */
+.submit-area {
+  text-align: center;
+  margin-top: 30px;
+}
+
+#submitBtn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 12px 30px;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#submitBtn:hover {
+  background: #1d4ed8;
+}
+
+#submitBtn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* ========== MOBILE ========== */
+@media (max-width: 600px) {
+  .exam-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .container {
+    margin: 10px;
+    padding: 15px;
+  }
+}

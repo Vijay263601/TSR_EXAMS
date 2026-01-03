@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Question Editor</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+
+<!-- AUTH CHECK -->
+<script>
+  if (sessionStorage.getItem("adminLoggedIn") !== "true") {
+    window.location.replace("../admin/login.html");
+  }
+</script>
+
+<header>
+  <h1>Question Editor</h1>
+</header>
+
+<div class="container">
+
+  <input
+    id="examId"
+    placeholder="Enter Exam ID (e.g. MEK_1)"
+    autocomplete="off"
+  >
+  <button class="load" onclick="goToAdd()">➕ Add Question</button>
+  <button class="add" onclick="loadQuestions()">Load Questions</button>
+
+  <div id="list"></div>
+<div class="back">
+    <button onclick="goBack()">← Back to Dashboard</button>
+  </div>
+
+
+<!-- Scripts -->
+<script src="../common/config.js"></script>
+<script src="editor.js"></script>
+
+</body>
+</html>

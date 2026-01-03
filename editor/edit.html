@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit Question</title>
+  <link rel="stylesheet" href="edit.css">
+</head>
+<body>
+
+<script>
+  if (sessionStorage.getItem("adminLoggedIn") !== "true") {
+    window.location.replace("../admin/login.html");
+  }
+</script>
+
+<header>
+  <h1>Edit Question</h1>
+  <p>Update question, options and correct answer</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+
+    <label>Question</label>
+    <textarea id="question" placeholder="Enter question here"></textarea>
+
+    <div class="options">
+
+      <div class="option">
+        <label>Option A</label>
+        <input id="optA">
+      </div>
+
+      <div class="option">
+        <label>Option B</label>
+        <input id="optB">
+      </div>
+
+      <div class="option">
+        <label>Option C</label>
+        <input id="optC">
+      </div>
+
+      <div class="option">
+        <label>Option D</label>
+        <input id="optD">
+      </div>
+
+    </div>
+
+    <label>Correct Answer</label>
+    <select id="correct">
+      <option value="A">Option A</option>
+      <option value="B">Option B</option>
+      <option value="C">Option C</option>
+      <option value="D">Option D</option>
+    </select>
+
+    <label>Image URL (optional)</label>
+    <input id="image" placeholder="https://example.com/image.png">
+
+    <div class="actions">
+      <button class="save" onclick="save()">💾 Save Changes</button>
+      <button class="back" onclick="goBack()">← Back to Questions</button>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="../common/config.js"></script>
+<script src="edit.js"></script>
+</body>
+</html>

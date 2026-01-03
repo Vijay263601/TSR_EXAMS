@@ -1,0 +1,77 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial;
+  background: #f1f5f9;
+}
+
+header {
+  background: #020617;
+  color: white;
+  padding: 18px;
+  text-align: center;
+}
+
+.container {
+  max-width: 900px;
+  margin: 30px auto;
+  padding: 0 16px;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+input {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+}
+
+button {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.load {
+  background: #2563eb;
+  color: white;
+}
+
+.add {
+  background: #16a34a;
+  color: white;
+}
+
+.question {
+  background: white;
+  padding: 18px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.question h3 {
+  margin: 0 0 10px;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.edit {
+  background: #2563eb;
+  color: white;
+}
+
+.delete {
+  background: #dc2626;
+  color: white;
+}

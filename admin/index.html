@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- AUTH CHECK -->
+<script>
+  if (sessionStorage.getItem("adminLoggedIn") !== "true") {
+    window.location.replace("login.html");
+  }
+</script>
+
+
+<header>
+  <h1>Admin Dashboard</h1>
+  <p>TSR Exams – Administration Panel</p>
+</header>
+
+<div class="container">
+
+  <div class="card" onclick="goToResults()">
+    <h3>📊 Exam Results</h3>
+    <p>View, download & analyze exam results</p>
+  </div>
+
+  <div class="card" onclick="goToImporter()">
+    <h3>📥 Import Questions</h3>
+    <p>Import MCQs from Google Forms</p>
+  </div>
+
+  <div class="card" onclick="goToEditor()">
+    <h3>✏️ Edit Questions</h3>
+    <p>Edit / Delete imported questions</p>
+  </div>
+
+  <div class="card" onclick="goToCreateExam()">
+    <h3>📝 Create Exam</h3>
+    <p>Create a new exam and manage questions</p>
+  </div>
+
+
+  <div class="card disabled">
+    <h3>👨‍🎓 Students</h3>
+    <p>Coming soon</p>
+  </div>
+
+</div>
+
+
+<div class="logout">
+  <button onclick="logoutAdmin()">Logout</button>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Add Question</title>
+  <link rel="stylesheet" href="add.css">
+</head>
+<body>
+
+<script>
+  if (sessionStorage.getItem("adminLoggedIn") !== "true") {
+    window.location.replace("../admin/login.html");
+  }
+</script>
+
+<header>
+  <h1>Add New Question</h1>
+</header>
+
+<div class="container">
+
+  <label>Question</label>
+  <textarea id="question"></textarea>
+
+  <label>Option A</label>
+  <input id="optA">
+
+  <label>Option B</label>
+  <input id="optB">
+
+  <label>Option C</label>
+  <input id="optC">
+
+  <label>Option D</label>
+  <input id="optD">
+
+  <label>Correct Answer</label>
+  <select id="correct">
+    <option value="A">A</option>
+    <option value="B">B</option>
+    <option value="C">C</option>
+    <option value="D">D</option>
+  </select>
+
+  <label>Image URL (optional)</label>
+  <input id="image">
+
+  <div class="actions">
+    <button onclick="save()">➕ Add</button>
+    <button class="back" onclick="goBack()">← Back</button>
+  </div>
+
+</div>
+
+<script src="../common/config.js"></script>
+<script src="add.js"></script>
+</body>
+</html>

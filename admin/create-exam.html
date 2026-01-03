@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create Exam</title>
+  <link rel="stylesheet" href="create-exam.css">
+</head>
+<body>
+
+<!-- AUTH CHECK -->
+<script>
+  if (sessionStorage.getItem("adminLoggedIn") !== "true") {
+    window.location.replace("login.html");
+  }
+</script>
+
+<header>
+  <h1>Create New Exam</h1>
+</header>
+
+<div class="container">
+
+  <label>Exam Name</label>
+  <input id="examName" placeholder="e.g. Safety MCQ Test">
+
+  <label>Duration (minutes)</label>
+  <input id="duration" type="number" placeholder="e.g. 30">
+
+  <label>Max Tab Switch Allowed</label>
+  <input id="maxTabSwitch" type="number" placeholder="e.g. 1">
+
+  <button onclick="createExam()">Create Exam</button>
+
+  <div id="result" class="result"></div>
+
+</div>
+<div class="back">
+    <button onclick="goBack()">← Back to Dashboard</button>
+  </div>
+
+<script src="../common/config.js"></script>
+<script src="create-exam.js"></script>
+</body>
+</html>

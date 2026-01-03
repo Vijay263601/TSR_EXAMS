@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Online Exam</title>
+  <link rel="stylesheet" href="exam.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="exam-header">
+  <h2 id="examTitle">Loading exam...</h2>
+  <div class="timer-box">
+    ⏱ <span id="timer">00:00</span>
+  </div>
+</div>
+
+<!-- WARNING -->
+<p id="warning"></p>
+
+<!-- MAIN -->
+<div class="container">
+  <div id="questionBox"></div>
+
+  <div class="submit-area">
+    <button id="submitBtn" onclick="submitExam()">Submit Exam</button>
+  </div>
+</div>
+
+<script src="../common/config.js"></script>
+<script src="exam.js"></script>
+</body>
+</html>

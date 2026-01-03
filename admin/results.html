@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Results</title>
+  <link rel="stylesheet" href="results.css">
+</head>
+
+<body>
+
+<!-- AUTH CHECK (MUST BE FIRST IN BODY) -->
+<script>
+  if (sessionStorage.getItem("adminLoggedIn") !== "true") {
+    window.location.replace("login.html");
+  }
+</script>
+
+
+<header>
+  <h2>Exam Results</h2>
+  <p>TSR Exams – Admin Dashboard</p>
+</header>
+
+<div class="container">
+
+  <div class="controls">
+    <input id="examId" placeholder="Enter Exam ID">
+    <button onclick="loadResults()">Load Results</button>
+    <button onclick="downloadExcel()">Download Excel</button>
+    <button class="logout" onclick="logoutAdmin()">Logout</button>
+  </div>
+  <div class="back">
+    <button onclick="goBack()">← Back to Dashboard</button>
+  </div>
+
+  <table id="table"></table>
+
+</div>
+
+<script src="../common/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="results.js"></script>
+</body>
+</html>

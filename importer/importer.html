@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Import Questions</title>
+  <link rel="stylesheet" href="importer.css">
+</head>
+<body>
+
+<!-- AUTH CHECK -->
+<script>
+  if (sessionStorage.getItem("adminLoggedIn") !== "true") {
+    window.location.replace("login.html");
+  }
+</script>
+
+<header>
+  <h1>Import Questions from Google Form</h1>
+  <p>TSR Exams – Admin Panel</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <label>Exam ID</label>
+    <input id="examId" placeholder="EXAM_12345">
+
+    <label>Google Form ID</label>
+    <input id="formId" placeholder="Paste Google Form ID here">
+
+    <button onclick="importQuestions()">Import Questions</button>
+
+    <p id="status"></p>
+  </div>
+
+  <div class="back">
+    <button onclick="goBack()">← Back to Dashboard</button>
+  </div>
+
+</div>
+
+<script src="../common/config.js"></script>
+<script src="importer.js"></script>
+</body>
+</html>
