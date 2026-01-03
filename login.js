@@ -1,3 +1,10 @@
+/*************************************************
+ * TSR EXAMS – STUDENT LOGIN SCRIPT
+ *************************************************/
+
+// GitHub Pages base path
+const BASE_PATH = "/tsr_exams";
+
 function startExam() {
   const name = document.getElementById("name").value.trim();
   const roll = document.getElementById("roll").value.trim();
@@ -9,13 +16,17 @@ function startExam() {
     return;
   }
 
-  // Save student info for exam page
+  // Save student info
   sessionStorage.setItem(
     "student",
-    JSON.stringify({ name, roll, email })
+    JSON.stringify({
+      name,
+      roll,
+      email
+    })
   );
 
-  // Redirect to exam
+  // ✅ CORRECT GITHUB PAGES REDIRECT
   window.location.href =
-  "/tsr_exams/exam/exam.html?examId=" + encodeURIComponent(examId);
+    `${BASE_PATH}/exam/exam.html?examId=${encodeURIComponent(examId)}`;
 }
