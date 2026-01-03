@@ -16,7 +16,6 @@ function startExam() {
   );
 
   // Redirect to exam
-   window.location.href =
-  "/tsr_exams/exam/exam.html?examId=" + encodeURIComponent(examId);
+     window.location.href =
+    "../tsr_exams/exam/exam.html?examId=" + encodeURIComponent(examId);
 }
-
