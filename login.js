@@ -16,17 +16,16 @@ function startExam() {
     return;
   }
 
-  // Save student info
   sessionStorage.setItem(
     "student",
     JSON.stringify({
-      name,
-      roll,
-      email
+      name: name,
+      roll: roll,
+      email: email
     })
   );
 
-  // ✅ CORRECT GITHUB PAGES REDIRECT
   window.location.href =
-    `${BASE_PATH}/exam/exam.html?examId=${encodeURIComponent(examId)}`;
+    BASE_PATH + "/exam/exam.html?examId=" +
+    encodeURIComponent(examId);
 }
